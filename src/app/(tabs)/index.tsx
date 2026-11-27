@@ -49,7 +49,7 @@ export default function HomeScreen() {
         <View style={styles.monthHeader}>
           <MonthArrow direction="left" onPress={() => setMonthOffset((m) => m - 1)} />
           <Pressable onPress={() => setMonthOffset(0)} accessibilityLabel="Voltar para o mês atual">
-            <ThemedText type="smallBold" style={styles.monthTitle}>
+            <ThemedText type="smallBold">
               {formatMonth(month.start)}
             </ThemedText>
           </Pressable>
@@ -151,9 +151,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  monthTitle: {
-    textTransform: 'capitalize',
   },
   arrow: {
     padding: Spacing.one,

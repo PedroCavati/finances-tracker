@@ -1,5 +1,5 @@
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui';
@@ -7,9 +7,9 @@ import { iconFor, SWATCHES } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, formatDayLabel, formatShortDate, today } from '@/lib/dates';
-import { digitsToCents, formatMoney } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 
-/** Campo de valor: digita só números e o valor enche da direita (R$ 0,01 → R$ 0,12 → R$ 1,23). */
+/** Campo de valor: cada dígito entra pela direita (R$ 0,01 → R$ 0,12 → R$ 1,23) e apagar remove o último. */
 export function AmountInput({
   value,
   onChange,
@@ -22,17 +22,25 @@ export function AmountInput({
   autoFocus?: boolean;
 }) {
   const theme = useTheme();
+
   return (
-    <TextInput
-      accessibilityLabel="Valor"
-      value={formatMoney(value)}
-      onChangeText={(text) => onChange(digitsToCents(text))}
-      keyboardType="number-pad"
-      autoFocus={autoFocus}
-      selectTextOnFocus={false}
-      contextMenuHidden
-      style={[styles.amount, { color: color ?? theme.text }]}
-    />
+    <View>
+      <Text style={[styles.amount, { color: color ?? theme.text }]}>{formatMoney(value)}</Text>
+      {/* Invisível e sempre vazio: só abre o teclado e recebe as teclas. */}
+      <TextInput
+        accessibilityLabel={`Valor, ${formatMoney(value)}`}
+        value=""
+        onKeyPress={({ nativeEvent: { key } }) => {
+          if (key === 'Backspace') onChange(Math.floor(value / 10));
+          else if (/^\d$/.test(key) && value < 1e11) onChange(value * 10 + Number(key));
+        }}
+        keyboardType="number-pad"
+        autoFocus={autoFocus}
+        caretHidden
+        contextMenuHidden
+        style={styles.amountHiddenInput}
+      />
+    </View>
   );
 }
 
@@ -131,11 +139,14 @@ export function DateField({ value, onChange }: { value: string; onChange: (iso: 
 const styles = StyleSheet.create({
   amount: {
     fontSize: 40,
-    lineHeight: 48,
     fontWeight: 700,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
     paddingVertical: Spacing.two,
+  },
+  amountHiddenInput: {
+    ...StyleSheet.absoluteFill,
+    color: 'transparent',
   },
   wrap: {
     flexDirection: 'row',

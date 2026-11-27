@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -19,9 +20,15 @@ export function Screen({
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+        Platform.OS === 'ios'
+          ? { paddingTop: Spacing.three, paddingBottom: Spacing.four }
+          : {
+            paddingTop: insets.top + Spacing.three,
+            paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
+          },
       ]}
       keyboardShouldPersistTaps="handled"
       {...scrollProps}>
@@ -43,15 +50,15 @@ export function FormScroll({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={[styles.content, { paddingTop: Spacing.three, paddingBottom: insets.bottom + Spacing.five }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      automaticallyAdjustKeyboardInsets
-      contentInsetAdjustmentBehavior="automatic">
+      contentInsetAdjustmentBehavior="automatic"
+      bottomOffset={Spacing.four}>
       <View style={[styles.inner, { gap: Spacing.four }]}>{children}</View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

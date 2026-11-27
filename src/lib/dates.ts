@@ -47,10 +47,11 @@ const MONTHS = [
 ];
 const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
-/** "novembro de 2026" */
+/** "Novembro de 2026" */
 export function formatMonth(iso: string) {
   const date = parseISODate(iso);
-  return `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+  const text = `${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** "Hoje", "Ontem" ou "qua, 25 de novembro" (com o ano só se não for o atual). */

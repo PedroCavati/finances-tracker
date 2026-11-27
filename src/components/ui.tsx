@@ -309,6 +309,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
     fontSize: 16,
+    lineHeight: 20,
   },
   badge: {
     alignItems: 'center',

@@ -119,7 +119,7 @@ export default function TransactionsScreen() {
       <TextField
         value={search}
         onChangeText={setSearch}
-        placeholder="Buscar por descrição, categoria ou observação"
+        placeholder="Buscar lançamentos"
         returnKeyType="search"
         clearButtonMode="while-editing"
         autoCorrect={false}
