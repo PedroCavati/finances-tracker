@@ -13,6 +13,7 @@ import type { TransactionKind } from '@/db/types';
 import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
 import { today } from '@/lib/dates';
+import { checkBudgetAlert } from '@/lib/budget-alerts';
 
 const KIND_TITLES: Record<TransactionKind, string> = {
   expense: 'despesa',
@@ -101,6 +102,10 @@ export default function TransactionForm() {
         },
         id
       );
+      if (kind === 'expense') {
+        // Sem await: o modal fecha na hora e o aviso chega logo depois.
+        checkBudgetAlert(db, categoryId, date).catch(() => { });
+      }
       router.back();
     } catch (error) {
       setSaving(false);

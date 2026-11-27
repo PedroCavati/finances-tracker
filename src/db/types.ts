@@ -57,3 +57,13 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   credit_card: 'Cartão de crédito',
   investment: 'Investimento',
 };
+
+/** Situação do orçamento de uma categoria principal de despesa num mês. */
+export type BudgetProgress = {
+  category_id: number;
+  name: string;
+  color: string;
+  icon: string;
+  budget: number; // limite em centavos; 0 = sem limite
+  spent: number; // gasto no mês em centavos, somando as subcategorias
+};

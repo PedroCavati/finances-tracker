@@ -19,6 +19,7 @@ export const Colors = {
     onTint: '#ffffff',
     income: '#18794E',
     expense: '#CE2C31',
+    warning: '#AB6400',
     transfer: '#0D74CE',
   },
   dark: {
@@ -32,6 +33,7 @@ export const Colors = {
     onTint: '#0A1F16',
     income: '#3DD68C',
     expense: '#FF6369',
+    warning: '#FFCA16',
     transfer: '#70B8FF',
   },
 } as const;

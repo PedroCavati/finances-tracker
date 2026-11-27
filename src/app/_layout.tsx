@@ -8,8 +8,10 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors } from '@/constants/theme';
 import { migrate } from '@/db/migrations';
+import { configureNotifications } from '@/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
+configureNotifications();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

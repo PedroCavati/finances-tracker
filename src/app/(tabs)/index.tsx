@@ -1,17 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
 
+import { BudgetBar, budgetLevel, useBudgetColor } from '@/components/budget-bar';
+import { MonthSwitcher } from '@/components/month-switcher';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { TransactionList } from '@/components/transaction-list';
 import { Button, Card, EmptyState, IconButton, SectionTitle } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { listAccounts, listTransactions, periodSummary } from '@/db/queries';
+import { budgetProgress, listAccounts, listTransactions, periodSummary } from '@/db/queries';
+import type { BudgetProgress } from '@/db/types';
 import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
-import { formatMonth, monthRange, today } from '@/lib/dates';
+import { monthKey, monthRange, today } from '@/lib/dates';
 import { formatMoney, formatSignedMoney } from '@/lib/money';
 
 export default function HomeScreen() {
@@ -26,6 +28,7 @@ export default function HomeScreen() {
     `${month.start}:${month.end}`
   );
   const { data: recent } = useQuery((db) => listTransactions(db, { end: now, limit: 8 }), now);
+  const { data: budgets } = useQuery((db) => budgetProgress(db, monthKey(month.start)), `budget:${month.start}`);
 
   const total = accounts?.reduce((sum, a) => sum + a.balance, 0) ?? 0;
   const net = summary?.net ?? 0;
@@ -46,15 +49,11 @@ export default function HomeScreen() {
       </Card>
 
       <Card style={styles.monthCard}>
-        <View style={styles.monthHeader}>
-          <MonthArrow direction="left" onPress={() => setMonthOffset((m) => m - 1)} />
-          <Pressable onPress={() => setMonthOffset(0)} accessibilityLabel="Voltar para o mês atual">
-            <ThemedText type="smallBold">
-              {formatMonth(month.start)}
-            </ThemedText>
-          </Pressable>
-          <MonthArrow direction="right" onPress={() => setMonthOffset((m) => m + 1)} />
-        </View>
+        <MonthSwitcher
+          monthStart={month.start}
+          onMove={(delta) => setMonthOffset((m) => m + delta)}
+          onReset={() => setMonthOffset(0)}
+        />
 
         <View style={styles.summaryRow}>
           <SummaryItem label="Receitas" value={formatMoney(summary?.income ?? 0)} color={theme.income} />
@@ -70,6 +69,8 @@ export default function HomeScreen() {
           </ThemedText>
         </View>
       </Card>
+
+      <BudgetSummary items={budgets ?? []} />
 
       <View style={styles.quickActions}>
         <Button title="− Despesa" variant="secondary" style={styles.quickButton} onPress={() => add('expense')} />
@@ -100,21 +101,64 @@ export default function HomeScreen() {
   );
 }
 
-function MonthArrow({ direction, onPress }: { direction: 'left' | 'right'; onPress: () => void }) {
-  const theme = useTheme();
-  const name =
-    direction === 'left'
-      ? ({ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' } as const)
-      : ({ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' } as const);
+/** Total do orçamento do mês e as categorias que passaram de 80%. Some se não houver limites. */
+function BudgetSummary({ items }: { items: BudgetProgress[] }) {
+  const withBudget = items.filter((p) => p.budget > 0);
+  if (withBudget.length === 0) return null;
+
+  const totalBudget = withBudget.reduce((sum, p) => sum + p.budget, 0);
+  const totalSpent = withBudget.reduce((sum, p) => sum + p.spent, 0);
+
+  // As mais críticas primeiro: maior proporção gasto/limite.
+  const attention = withBudget
+    .filter((p) => budgetLevel(p.spent, p.budget) !== 'ok')
+    .sort((a, b) => b.spent / b.budget - a.spent / a.budget)
+    .slice(0, 3);
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={direction === 'left' ? 'Mês anterior' : 'Próximo mês'}
-      hitSlop={12}
-      onPress={onPress}
-      style={styles.arrow}>
-      <SymbolView name={name} size={16} tintColor={theme.textSecondary} />
+      accessibilityLabel={`Orçamento: ${formatMoney(totalSpent)} de ${formatMoney(totalBudget)}`}
+      onPress={() => router.navigate('/categories')}
+      style={({ pressed }) => pressed && { opacity: 0.7 }}>
+      <Card style={styles.budgetCard}>
+        <View style={styles.budgetHeader}>
+          <ThemedText type="smallBold">Orçamento</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.tabular}>
+            {formatMoney(totalSpent)} de {formatMoney(totalBudget)}
+          </ThemedText>
+        </View>
+        <BudgetBar spent={totalSpent} budget={totalBudget} />
+        {attention.length === 0 ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            Tudo dentro do limite.
+          </ThemedText>
+        ) : (
+          attention.map((p) => <AttentionRow key={p.category_id} item={p} />)
+        )}
+      </Card>
     </Pressable>
+  );
+}
+
+function AttentionRow({ item }: { item: BudgetProgress }) {
+  const level = budgetLevel(item.spent, item.budget);
+  const color = useBudgetColor(level);
+  const detail =
+    level === 'over'
+      ? `${formatMoney(item.spent - item.budget)} acima`
+      : `${Math.round((item.spent / item.budget) * 100)}%`;
+
+  return (
+    <View style={styles.attentionRow}>
+      <View style={[styles.dot, { backgroundColor: color }]} />
+      <ThemedText type="small" style={styles.attentionName} numberOfLines={1}>
+        {item.name}
+      </ThemedText>
+      <ThemedText type="small" style={[styles.tabular, { color }]}>
+        {detail}
+      </ThemedText>
+    </View>
   );
 }
 
@@ -147,13 +191,24 @@ const styles = StyleSheet.create({
   monthCard: {
     gap: Spacing.three,
   },
-  monthHeader: {
+  budgetCard: {
+    gap: Spacing.two,
+  },
+  budgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  attentionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.two,
   },
-  arrow: {
-    padding: Spacing.one,
+  attentionName: {
+    flex: 1,
+  },
+  tabular: {
+    fontVariant: ['tabular-nums'],
   },
   summaryRow: {
     flexDirection: 'row',

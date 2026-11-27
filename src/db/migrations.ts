@@ -87,6 +87,26 @@ const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       );
     }
   },
+
+  // V2: orçamento mensal por categoria
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        amount INTEGER NOT NULL CHECK (amount >= 0),
+        valid_from TEXT NOT NULL,
+        UNIQUE (category_id, valid_from)
+      );
+
+      CREATE TABLE budget_alerts (
+        category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        month TEXT NOT NULL,
+        level INTEGER NOT NULL CHECK (level IN (80, 100)),
+        PRIMARY KEY (category_id, month, level)
+      );
+    `);
+  },
 ];
 
 export async function migrate(db: SQLiteDatabase) {

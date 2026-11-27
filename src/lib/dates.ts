@@ -17,6 +17,11 @@ export function today() {
   return toISODate(new Date());
 }
 
+/** "2026-11-26" → "2026-11" (mês usado no orçamento). */
+export function monthKey(iso: string) {
+  return iso.slice(0, 7);
+}
+
 export function addDays(iso: string, days: number) {
   const date = parseISODate(iso);
   date.setDate(date.getDate() + days);

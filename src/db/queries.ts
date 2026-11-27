@@ -5,6 +5,7 @@ import type {
   Account,
   AccountInput,
   AccountWithBalance,
+  BudgetProgress,
   Category,
   CategoryInput,
   CategoryKind,
@@ -117,7 +118,7 @@ export async function saveCategory(db: SQLiteDatabase, input: CategoryInput, id?
       id
     );
   } else {
-    await db.runAsync(
+    const result = await db.runAsync(
       'INSERT INTO categories (name, kind, color, icon, parent_id) VALUES (?, ?, ?, ?, ?)',
       input.name,
       input.kind,
@@ -125,8 +126,10 @@ export async function saveCategory(db: SQLiteDatabase, input: CategoryInput, id?
       input.icon,
       input.parent_id
     );
+    id = result.lastInsertRowId;
   }
   notifyDataChanged();
+  return id;
 }
 
 /** Apaga a categoria e as subcategorias. Os lançamentos ficam "sem categoria". */
@@ -253,4 +256,88 @@ export async function periodSummary(db: SQLiteDatabase, start: string, end: stri
   const income = row?.income ?? 0;
   const expense = row?.expense ?? 0;
   return { income, expense, net: income - expense };
+}
+
+// ─── Orçamento ─────────────────────────────────────────────────────────────
+
+/**
+ * Define o limite mensal da categoria a partir de `month` ("2026-11").
+ * Use 0 para "sem limite". Meses anteriores mantêm o limite que tinham.
+ */
+export async function setBudget(db: SQLiteDatabase, categoryId: number, amount: number, month: string) {
+  await db.runAsync(
+    `INSERT INTO budgets (category_id, amount, valid_from) VALUES (?, ?, ?)
+     ON CONFLICT (category_id, valid_from) DO UPDATE SET amount = excluded.amount`,
+    categoryId,
+    amount,
+    month
+  );
+  notifyDataChanged();
+}
+
+/** Limite que vale para a categoria no mês (0 = sem limite). */
+export async function getBudget(db: SQLiteDatabase, categoryId: number, month: string) {
+  const row = await db.getFirstAsync<{ amount: number }>(
+    `SELECT amount FROM budgets
+     WHERE category_id = ? AND valid_from <= ?
+     ORDER BY valid_from DESC LIMIT 1`,
+    categoryId,
+    month
+  );
+  return row?.amount ?? 0;
+}
+
+/** Limite e gasto do mês de cada categoria principal de despesa. */
+export function budgetProgress(db: SQLiteDatabase, month: string) {
+  return db.getAllAsync<BudgetProgress>(
+    `SELECT c.id AS category_id, c.name, c.color, c.icon,
+       COALESCE((
+         SELECT b.amount FROM budgets b
+         WHERE b.category_id = c.id AND b.valid_from <= $month
+         ORDER BY b.valid_from DESC LIMIT 1
+       ), 0) AS budget,
+       COALESCE((
+         SELECT SUM(t.amount) FROM transactions t
+         LEFT JOIN categories sub ON sub.id = t.category_id
+         WHERE t.kind = 'expense'
+           AND t.date BETWEEN $start AND $end
+           AND (t.category_id = c.id OR sub.parent_id = c.id)
+       ), 0) AS spent
+     FROM categories c
+     WHERE c.kind = 'expense' AND c.parent_id IS NULL
+     ORDER BY c.name COLLATE NOCASE`,
+    { $month: month, $start: `${month}-01`, $end: `${month}-31` }
+  );
+}
+
+/**
+ * Registra que o aviso de `level`% foi enviado para a categoria no mês.
+ * Devolve true só na primeira vez; nas seguintes o banco ignora a gravação.
+ */
+export async function markBudgetAlert(
+  db: SQLiteDatabase,
+  categoryId: number,
+  month: string,
+  level: 80 | 100
+) {
+  const result = await db.runAsync(
+    'INSERT OR IGNORE INTO budget_alerts (category_id, month, level) VALUES (?, ?, ?)',
+    categoryId,
+    month,
+    level
+  );
+  return result.changes > 0;
+}
+
+/** Gasto do mês por categoria, sem somar subcategorias (para mostrar o gasto de cada subcategoria). */
+export function categorySpending(db: SQLiteDatabase, month: string) {
+  return db.getAllAsync<{ category_id: number; spent: number }>(
+    `SELECT category_id, SUM(amount) AS spent
+     FROM transactions
+     WHERE kind = 'expense' AND category_id IS NOT NULL
+       AND date BETWEEN ? AND ?
+     GROUP BY category_id`,
+    `${month}-01`,
+    `${month}-31`
+  );
 }

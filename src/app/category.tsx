@@ -3,15 +3,18 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
-import { IconPicker, SwatchPicker } from '@/components/pickers';
+import { AmountInput, IconPicker, SwatchPicker } from '@/components/pickers';
 import { FormScroll } from '@/components/screen';
+import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, Field, HeaderButton, Segmented, TextField } from '@/components/ui';
 import { CATEGORY_ICON_KEYS } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
-import { deleteCategory, getCategory, listCategories, saveCategory } from '@/db/queries';
+import { deleteCategory, getBudget, getCategory, listCategories, saveCategory, setBudget } from '@/db/queries';
 import type { Category, CategoryKind } from '@/db/types';
 import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
+import { monthKey, today } from '@/lib/dates';
+import { ensureNotificationPermission } from '@/lib/notifications';
 
 export default function CategoryForm() {
   const db = useSQLiteContext();
@@ -26,24 +29,31 @@ export default function CategoryForm() {
   const [icon, setIcon] = useState('other');
   const [parentId, setParentId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [budgetAmount, setBudgetAmount] = useState(0);
+  const [savedBudget, setSavedBudget] = useState(0);
 
   const { data: all } = useQuery((d) => listCategories(d, kind), kind);
   // Só um nível de subcategoria: a mãe tem que ser de topo e não pode ser a própria.
   const parentOptions = (all ?? []).filter((c) => c.parent_id === null && c.id !== id);
   const hasChildren = !!id && (all ?? []).some((c) => c.parent_id === id);
+  const canHaveBudget = kind === 'expense' && parentId === null;
 
   useEffect(() => {
     if (!id) return;
-    getCategory(db, id).then((category: Category | null) => {
-      if (category) {
-        setName(category.name);
-        setKind(category.kind);
-        setColor(category.color);
-        setIcon(category.icon);
-        setParentId(category.parent_id);
+    Promise.all([getCategory(db, id), getBudget(db, id, monthKey(today()))]).then(
+      ([category, budget]: [Category | null, number]) => {
+        if (category) {
+          setName(category.name);
+          setKind(category.kind);
+          setColor(category.color);
+          setIcon(category.icon);
+          setParentId(category.parent_id);
+        }
+        setBudgetAmount(budget);
+        setSavedBudget(budget);
+        setLoaded(true);
       }
-      setLoaded(true);
-    });
+    );
   }, [db, id]);
 
   const canSave = name.trim().length > 0 && !saving;
@@ -52,7 +62,17 @@ export default function CategoryForm() {
     if (!canSave) return;
     setSaving(true);
     try {
-      await saveCategory(db, { name: name.trim(), kind, color, icon, parent_id: parentId }, id);
+      const categoryId = await saveCategory(
+        db,
+        { name: name.trim(), kind, color, icon, parent_id: parentId },
+        id
+      );
+      const newBudget = canHaveBudget ? budgetAmount : 0;
+      if (newBudget !== savedBudget) {
+        await setBudget(db, categoryId, newBudget, monthKey(today()));
+      }
+      // É aqui que os avisos passam a fazer sentido: pede permissão (só pergunta uma vez).
+      if (newBudget > 0) await ensureNotificationPermission();
       router.back();
     } catch (error) {
       setSaving(false);
@@ -129,6 +149,17 @@ export default function CategoryForm() {
           </Field>
         )}
 
+        {canHaveBudget && (
+          <Field label="Limite mensal">
+            <AmountInput value={budgetAmount} onChange={setBudgetAmount} />
+            <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+              {budgetAmount === 0
+                ? 'Sem limite. Digite um valor para acompanhar quanto gasta nesta categoria.'
+                : 'Vale a partir deste mês. Os meses anteriores mantêm o limite que tinham.'}
+            </ThemedText>
+          </Field>
+        )}
+
         <Field label="Cor">
           <SwatchPicker value={color} onChange={setColor} />
         </Field>
@@ -154,5 +185,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.two,
+  },
+  hint: {
+    textAlign: 'center',
   },
 });
