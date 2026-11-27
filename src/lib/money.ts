@@ -1,3 +1,4 @@
+/** Formatador de reais. Os valores do app são centavos inteiros; divida por 100 antes. */
 const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /** Formata centavos como "R$ 1.234,56" (negativos com sinal de menos: "−R$ 755,10"). */

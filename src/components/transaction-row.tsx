@@ -18,11 +18,13 @@ export function TransactionRow({ item, accountId }: { item: Row; accountId?: num
   const color = isTransfer ? theme.transfer : item.kind === 'income' ? theme.income : theme.text;
   const sign = isTransfer && !accountId ? '' : incoming ? '+' : '−';
 
+  // "Alimentação › Mercado" para subcategoria; só o nome para principal.
   const category = item.category_name
     ? item.parent_category_name
       ? `${item.parent_category_name} › ${item.category_name}`
       : item.category_name
     : null;
+  // Título: descrição, ou a categoria se não houver. Subtítulo: o que sobrou e a conta.
   const title = item.description || (isTransfer ? 'Transferência' : (category ?? 'Sem categoria'));
   const subtitle = isTransfer
     ? `${item.account_name} → ${item.to_account_name}`

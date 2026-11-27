@@ -1,6 +1,10 @@
-import type { SQLiteDatabase, SQLiteBindValue } from 'expo-sqlite';
+/**
+ * Todas as leituras e escritas no banco, agrupadas por tabela.
+ * Funções que gravam chamam `notifyDataChanged()` para as telas abertas se atualizarem.
+ */
+import type { SQLiteBindValue, SQLiteDatabase } from 'expo-sqlite';
 
-import { notifyDataChanged } from './events';
+import { notifyDataChanged } from '@/db/events';
 import type {
   Account,
   AccountInput,
@@ -9,11 +13,14 @@ import type {
   Category,
   CategoryInput,
   CategoryKind,
+  Recurrence,
+  RecurrenceInput,
+  RecurrenceRow,
   Transaction,
   TransactionInput,
   TransactionKind,
   TransactionRow,
-} from './types';
+} from '@/db/types';
 
 // ─── Contas ────────────────────────────────────────────────────────────────
 
@@ -45,6 +52,7 @@ export function listAccounts(db: SQLiteDatabase, untilDate: string, includeArchi
   );
 }
 
+/** Uma conta pelo id, sem o saldo. */
 export function getAccount(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Account>('SELECT * FROM accounts WHERE id = ?', id);
 }
@@ -107,10 +115,12 @@ export function listCategories(db: SQLiteDatabase, kind?: CategoryKind) {
   );
 }
 
+/** Uma categoria pelo id. */
 export function getCategory(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Category>('SELECT * FROM categories WHERE id = ?', id);
 }
 
+/** Cria a categoria (sem `id`) ou atualiza a existente. Devolve o id. */
 export async function saveCategory(db: SQLiteDatabase, input: CategoryInput, id?: number) {
   if (id) {
     await db.runAsync(
@@ -210,6 +220,7 @@ export function listTransactions(db: SQLiteDatabase, filters: TransactionFilters
   );
 }
 
+/** Um lançamento pelo id, para o formulário de edição. */
 export function getTransaction(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Transaction>('SELECT * FROM transactions WHERE id = ?', id);
 }
@@ -236,14 +247,16 @@ export async function saveTransaction(db: SQLiteDatabase, input: TransactionInpu
     );
   } else {
     await db.runAsync(
-      `INSERT INTO transactions (kind, amount, date, description, notes, account_id, to_account_id, category_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ...values
+      `INSERT INTO transactions (kind, amount, date, description, notes, account_id, to_account_id, category_id, recurrence_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ...values,
+      input.recurrence_id ?? null
     );
   }
   notifyDataChanged();
 }
 
+/** Apaga um lançamento. */
 export async function deleteTransaction(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
   notifyDataChanged();
@@ -348,4 +361,116 @@ export function categorySpending(db: SQLiteDatabase, month: string) {
     `${month}-01`,
     `${month}-31`
   );
+}
+
+// ─── Recorrências ──────────────────────────────────────────────────────────
+
+/** Recorrências ativas com ocorrência pendente até `until`. Com `auto`, só as desse modo. */
+export function listDueRecurrences(db: SQLiteDatabase, until: string, auto?: boolean) {
+  return db.getAllAsync<Recurrence>(
+    `SELECT * FROM recurrences
+     WHERE paused = 0 AND next_date <= ? ${auto === undefined ? '' : 'AND auto = ?'}
+     ORDER BY next_date`,
+    auto === undefined ? [until] : [until, auto ? 1 : 0]
+  );
+}
+
+/** Cria o lançamento de uma ocorrência, já vinculado à recorrência. */
+export async function insertRecurrenceTransaction(db: SQLiteDatabase, rec: Recurrence, date: string) {
+  const isTransfer = rec.kind === 'transfer';
+  await db.runAsync(
+    `INSERT INTO transactions
+       (kind, amount, date, description, notes, account_id, to_account_id, category_id, recurrence_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    rec.kind,
+    rec.amount,
+    date,
+    rec.description,
+    rec.notes,
+    rec.account_id,
+    isTransfer ? rec.to_account_id : null,
+    isTransfer ? null : rec.category_id,
+    rec.id
+  );
+}
+
+/** Avança o "ponteiro" da recorrência para a próxima ocorrência ainda não gerada. */
+export async function setRecurrenceNextDate(db: SQLiteDatabase, id: number, nextDate: string) {
+  await db.runAsync('UPDATE recurrences SET next_date = ? WHERE id = ?', nextDate, id);
+}
+
+/** Todas as recorrências com nomes resolvidos: ativas primeiro, depois pela próxima data. */
+export function listRecurrences(db: SQLiteDatabase) {
+  return db.getAllAsync<RecurrenceRow>(
+    `SELECT r.*,
+       a.name AS account_name,
+       ta.name AS to_account_name,
+       c.name AS category_name,
+       c.color AS category_color,
+       c.icon AS category_icon,
+       COALESCE(c.parent_id, c.id) AS budget_category_id
+     FROM recurrences r
+     JOIN accounts a ON a.id = r.account_id
+     LEFT JOIN accounts ta ON ta.id = r.to_account_id
+     LEFT JOIN categories c ON c.id = r.category_id
+     ORDER BY r.paused, r.next_date`
+  );
+}
+
+/** Uma recorrência pelo id, no formato de `RecurrenceRow` (os nomes vêm nulos). */
+export function getRecurrence(db: SQLiteDatabase, id: number) {
+  return db.getFirstAsync<RecurrenceRow>(
+    `SELECT r.*, NULL AS account_name, NULL AS to_account_name, NULL AS category_name,
+       NULL AS category_color, NULL AS category_icon, NULL AS budget_category_id
+     FROM recurrences r WHERE r.id = ?`,
+    id
+  );
+}
+
+/** Cria a recorrência (sem `id`) ou atualiza a existente. Devolve o id. */
+export async function saveRecurrence(db: SQLiteDatabase, input: RecurrenceInput, id?: number) {
+  const isTransfer = input.kind === 'transfer';
+  const values = [
+    input.kind,
+    input.amount,
+    input.description.trim(),
+    input.notes.trim(),
+    input.account_id,
+    isTransfer ? input.to_account_id : null,
+    isTransfer ? null : input.category_id,
+    input.frequency,
+    input.anchor_date,
+    input.next_date,
+    input.auto,
+    input.paused,
+    input.business_days,
+    input.business_day_n,
+    input.notify,
+  ];
+  if (id) {
+    await db.runAsync(
+      `UPDATE recurrences SET kind = ?, amount = ?, description = ?, notes = ?, account_id = ?,
+         to_account_id = ?, category_id = ?, frequency = ?, anchor_date = ?, next_date = ?, auto = ?,
+         paused = ?, business_days = ?, business_day_n = ?, notify = ?
+       WHERE id = ?`,
+      ...values,
+      id
+    );
+  } else {
+    const result = await db.runAsync(
+      `INSERT INTO recurrences (kind, amount, description, notes, account_id, to_account_id, category_id,
+         frequency, anchor_date, next_date, auto, paused, business_days, business_day_n, notify)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ...values
+    );
+    id = result.lastInsertRowId;
+  }
+  notifyDataChanged();
+  return id;
+}
+
+/** Apaga a regra. Os lançamentos já gerados continuam, só sem o vínculo. */
+export async function deleteRecurrence(db: SQLiteDatabase, id: number) {
+  await db.runAsync('DELETE FROM recurrences WHERE id = ?', id);
+  notifyDataChanged();
 }

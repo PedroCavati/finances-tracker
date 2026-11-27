@@ -18,6 +18,7 @@ import {
 import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 
+/** Ícone sugerido para cada tipo ao criar uma conta (ao editar, trocar o tipo não muda o ícone). */
 const DEFAULT_ICON: Record<AccountType, string> = {
   checking: 'bank',
   savings: 'piggy',
@@ -26,13 +27,19 @@ const DEFAULT_ICON: Record<AccountType, string> = {
   investment: 'invest',
 };
 
+// ─── Tela ─────────────────────────────────────────────────────────────────────
+
 /** Modal de conta. Sem `id`, cria; com `id`, edita, arquiva ou apaga. */
 export default function AccountForm() {
   const db = useSQLiteContext();
   const theme = useTheme();
+
+  // Parâmetros da rota
   const params = useLocalSearchParams<{ id?: string }>();
   const id = params.id ? Number(params.id) : undefined;
 
+  // Campos. `loaded`: undefined = carregando, null = conta nova, Account = a conta salva.
+  // O saldo fica sempre positivo no campo; `negative` guarda o sinal.
   const [loaded, setLoaded] = useState<Account | null | undefined>(id ? undefined : null);
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
@@ -43,6 +50,7 @@ export default function AccountForm() {
   const [icon, setIcon] = useState('bank');
   const [saving, setSaving] = useState(false);
 
+  // Preenche os campos ao editar.
   useEffect(() => {
     if (!id) return;
     getAccount(db, id).then((account) => {
@@ -57,7 +65,10 @@ export default function AccountForm() {
     });
   }, [db, id]);
 
+  // Validação
   const canSave = name.trim().length > 0 && !saving;
+
+  // ── Ações ──
 
   async function onSave() {
     if (!canSave) return;
@@ -75,6 +86,7 @@ export default function AccountForm() {
     }
   }
 
+  /** Avisa quantos lançamentos vão junto antes de apagar. */
   async function onDelete() {
     if (!id) return;
     const count = await countAccountTransactions(db, id);
@@ -103,6 +115,9 @@ export default function AccountForm() {
     router.back();
   }
 
+  // ── Formulário ──
+
+  // Enquanto carrega, só o cabeçalho.
   if (id && loaded === undefined) return <Stack.Screen options={{ title: 'Conta' }} />;
 
   return (
@@ -114,6 +129,7 @@ export default function AccountForm() {
         }}
       />
       <FormScroll keyboardAware={!amountFocused}>
+        {/* Nome e tipo. Ao criar, o tipo também troca o ícone. */}
         <Field label="Nome">
           <TextField value={name} onChangeText={setName} placeholder="Ex.: Nubank, Itaú, Carteira" autoFocus={!id} />
         </Field>
@@ -134,6 +150,7 @@ export default function AccountForm() {
           </View>
         </Field>
 
+        {/* Saldo: na criação é o saldo de hoje; na edição, o inicial (antes dos lançamentos). */}
         <Field label={id ? 'Saldo inicial' : 'Saldo atual'}>
           <Segmented
             value={negative ? 'neg' : 'pos'}
@@ -151,6 +168,7 @@ export default function AccountForm() {
           />
         </Field>
 
+        {/* Aparência */}
         <Field label="Cor">
           <SwatchPicker value={color} onChange={setColor} />
         </Field>
@@ -159,6 +177,7 @@ export default function AccountForm() {
           <IconPicker icons={ACCOUNT_ICON_KEYS} value={icon} color={color} onChange={setIcon} />
         </Field>
 
+        {/* Botões: salvar e, ao editar, ver lançamentos, arquivar e apagar */}
         <View style={styles.actions}>
           <Button title="Salvar" onPress={onSave} disabled={!canSave} />
           {id && (
@@ -180,6 +199,8 @@ export default function AccountForm() {
     </>
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   wrap: {

@@ -1,11 +1,11 @@
-import { Tabs, TabList, TabTrigger, TabSlot, TabTriggerSlotProps, TabListProps } from 'expo-router/ui';
-import { Pressable, View, StyleSheet, type PressableProps } from 'react-native';
+import { TabList, TabSlot, Tabs, TabTrigger, type TabListProps, type TabTriggerSlotProps } from 'expo-router/ui';
+import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 
-import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
-
+/** Barra de abas da versão web: uma pílula flutuante no rodapé com o nome do app e as abas. */
 export default function AppTabs() {
   return (
     <Tabs>
@@ -30,6 +30,7 @@ export default function AppTabs() {
   );
 }
 
+/** Botão de uma aba; destacado quando é a aba atual. */
 export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
   return (
     <Pressable {...(props as PressableProps)} style={({ pressed }) => pressed && styles.pressed}>
@@ -44,6 +45,7 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
   );
 }
 
+/** Fundo da barra, com o nome do app à esquerda. */
 export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>

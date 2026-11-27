@@ -16,7 +16,7 @@ import { iconFor } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-// ─── Cartão ────────────────────────────────────────────────────────────────
+// ─── Cartão e título de seção ─────────────────────────────────────────────────
 
 /** Fundo arredondado que agrupa conteúdo. */
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
@@ -42,6 +42,7 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
 
 // ─── Botões ────────────────────────────────────────────────────────────────
 
+/** Props do Pressable, mais o texto e a variante. */
 type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   title: string;
   variant?: 'primary' | 'secondary' | 'danger';
@@ -253,7 +254,10 @@ export function EmptyState({ title, message, action }: { title: string; message?
   );
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // Cartão e título de seção
   card: {
     borderRadius: Spacing.three,
     padding: Spacing.three,
@@ -269,6 +273,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontSize: 12,
   },
+
+  // Botões
   button: {
     minHeight: 50,
     borderRadius: Spacing.three,
@@ -290,6 +296,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
   },
+
+  // Chips
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,6 +317,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: 10,
   },
+
+  // Campos
   field: {
     gap: Spacing.two,
   },
@@ -320,10 +330,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
   },
+
+  // Ícone
   badge: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // Estado vazio
   empty: {
     alignItems: 'center',
     gap: Spacing.two,

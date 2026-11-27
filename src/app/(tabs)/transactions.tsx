@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -13,6 +13,8 @@ import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
 import { monthRange, today } from '@/lib/dates';
 import { formatMoney, formatSignedMoney } from '@/lib/money';
+
+// ─── Opções dos filtros ────────────────────────────────────────────────────
 
 type Period = 'month' | 'last_month' | 'three_months' | 'year' | 'all';
 
@@ -31,8 +33,10 @@ const KINDS: { value: TransactionKind | null; label: string }[] = [
   { value: 'transfer', label: 'Transferências' },
 ];
 
+/** Máximo de lançamentos carregados de uma vez; acima disso aparece um aviso no fim da lista. */
 const LIMIT = 300;
 
+/** Datas de início e fim de cada período. "Tudo" não tem limite de datas. */
 function periodRange(period: Period, now: string): { start?: string; end?: string } {
   switch (period) {
     case 'month':
@@ -48,12 +52,18 @@ function periodRange(period: Period, now: string): { start?: string; end?: strin
   }
 }
 
-/** Aba Lançamentos: histórico com busca e filtros. O parâmetro `accountId` abre já filtrado por uma conta. */
+// ─── Tela ──────────────────────────────────────────────────────────────────
+
+/**
+ * Aba Lançamentos: busca, filtros (período, tipo, e em "Mais filtros" conta e categoria),
+ * totais do que está filtrado e a lista. O parâmetro `accountId` abre já filtrado por uma conta.
+ */
 export default function TransactionsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ accountId?: string }>();
   const now = today();
 
+  // Filtros escolhidos
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState<Period>('month');
   const [kind, setKind] = useState<TransactionKind | null>(null);
@@ -70,6 +80,7 @@ export default function TransactionsScreen() {
     setShowMore(true);
   }
 
+  // Dados do banco
   const filters: TransactionFilters = {
     ...periodRange(period, now),
     search,
@@ -82,10 +93,13 @@ export default function TransactionsScreen() {
   const { data: accounts } = useQuery((db) => listAccounts(db, now, true), now);
   const { data: categories } = useQuery((db) => listCategories(db), 'all');
 
+  // Valores calculados
+  // Só categorias principais, do tipo escolhido (filtrar a principal já inclui as subcategorias).
   const topCategories = (categories ?? []).filter(
     (c) => c.parent_id === null && (kind === null || kind === c.kind)
   );
 
+  // Totais do que está na lista (transferências não entram).
   let income = 0;
   let expense = 0;
   for (const t of items ?? []) {
@@ -93,9 +107,11 @@ export default function TransactionsScreen() {
     if (t.kind === 'expense') expense += t.amount;
   }
 
+  // Quantos filtros de "Mais filtros" estão ativos, e se há algum filtro fora do padrão.
   const activeExtra = (accountId ? 1 : 0) + (categoryId ? 1 : 0);
   const hasFilters = !!search || period !== 'month' || kind !== null || activeExtra > 0;
 
+  // Ações
   function clearFilters() {
     setSearch('');
     setPeriod('month');
@@ -110,13 +126,21 @@ export default function TransactionsScreen() {
     <Screen
       title="Lançamentos"
       actions={
-        <IconButton
-          icon={{ ios: 'plus', android: 'add', web: 'add' }}
-          label="Novo lançamento"
-          filled
-          onPress={() => router.push({ pathname: '/transaction', params: { kind: kind ?? 'expense' } })}
-        />
+        <>
+          <IconButton
+            icon={{ ios: 'repeat', android: 'repeat', web: 'repeat' }}
+            label="Recorrentes"
+            onPress={() => router.push('/recurrences')}
+          />
+          <IconButton
+            icon={{ ios: 'plus', android: 'add', web: 'add' }}
+            label="Novo lançamento"
+            filled
+            onPress={() => router.push({ pathname: '/transaction', params: { kind: kind ?? 'expense' } })}
+          />
+        </>
       }>
+      {/* Busca */}
       <TextField
         value={search}
         onChangeText={setSearch}
@@ -126,12 +150,14 @@ export default function TransactionsScreen() {
         autoCorrect={false}
       />
 
+      {/* Período */}
       <ChipRow>
         {PERIODS.map((p) => (
           <Chip key={p.value} label={p.label} selected={period === p.value} onPress={() => setPeriod(p.value)} />
         ))}
       </ChipRow>
 
+      {/* Tipo. Trocar o tipo limpa a categoria, que pode não existir no novo tipo. */}
       <ChipRow>
         {KINDS.map((k) => (
           <Chip
@@ -146,6 +172,7 @@ export default function TransactionsScreen() {
         ))}
       </ChipRow>
 
+      {/* "Mais filtros" e "Limpar filtros" */}
       <View style={styles.moreRow}>
         <Pressable onPress={() => setShowMore((v) => !v)} hitSlop={8}>
           <ThemedText type="small" style={{ color: theme.tint }}>
@@ -161,6 +188,7 @@ export default function TransactionsScreen() {
         )}
       </View>
 
+      {/* Conta e categoria */}
       {showMore && (
         <>
           <Field label="Conta">
@@ -198,6 +226,7 @@ export default function TransactionsScreen() {
         </>
       )}
 
+      {/* Totais */}
       {items && items.length > 0 && (
         <View style={[styles.totals, { backgroundColor: theme.backgroundElement }]}>
           <Total label="Receitas" value={formatMoney(income)} color={theme.income} />
@@ -206,6 +235,7 @@ export default function TransactionsScreen() {
         </View>
       )}
 
+      {/* Lista */}
       {items && items.length === 0 && (
         <EmptyState
           title={hasFilters ? 'Nada encontrado' : 'Nenhum lançamento neste mês'}
@@ -224,7 +254,10 @@ export default function TransactionsScreen() {
   );
 }
 
-function ChipRow({ children }: { children: React.ReactNode }) {
+// ─── Partes da tela ────────────────────────────────────────────────────────
+
+/** Linha de chips com rolagem horizontal, que vai de borda a borda da tela. */
+function ChipRow({ children }: { children: ReactNode }) {
   return (
     <ScrollView
       horizontal
@@ -236,6 +269,7 @@ function ChipRow({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Um dos três totais acima da lista. */
 function Total({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <View style={styles.totalItem}>
@@ -253,7 +287,10 @@ function Total({ label, value, color }: { label: string; value: string; color?: 
   );
 }
 
+// ─── Estilos ───────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // Filtros
   chipScroll: {
     marginHorizontal: -Spacing.three,
   },
@@ -265,6 +302,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+
+  // Totais e lista
   totals: {
     flexDirection: 'row',
     borderRadius: Spacing.three,

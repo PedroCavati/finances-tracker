@@ -1,13 +1,19 @@
 import type { ReactNode } from 'react';
 import { Platform, ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Tela de aba: título grande, ações à direita e conteúdo rolável. */
+// ─── Telas de aba ─────────────────────────────────────────────────────────────
+
+/**
+ * Tela de aba: título grande, ações à direita e conteúdo rolável.
+ * No iOS as abas nativas já descontam a barra de status e a barra de abas; no Android, não,
+ * então o espaçamento soma as áreas seguras.
+ */
 export function Screen({
   title,
   actions,
@@ -26,9 +32,9 @@ export function Screen({
         Platform.OS === 'ios'
           ? { paddingTop: Spacing.three, paddingBottom: Spacing.four }
           : {
-            paddingTop: insets.top + Spacing.three,
-            paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
-          },
+              paddingTop: insets.top + Spacing.three,
+              paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
+            },
       ]}
       keyboardShouldPersistTaps="handled"
       {...scrollProps}>
@@ -45,8 +51,9 @@ export function Screen({
   );
 }
 
-/** Conteúdo rolável dos formulários apresentados como modal. */
-/** Conteúdo rolável dos formulários apresentados como modal. */
+// ─── Formulários ──────────────────────────────────────────────────────────────
+
+/** Conteúdo rolável dos formulários apresentados como modal. Rola sozinho até o campo em foco. */
 export function FormScroll({
   children,
   keyboardAware = true,
@@ -70,6 +77,8 @@ export function FormScroll({
     </KeyboardAwareScrollView>
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   content: {

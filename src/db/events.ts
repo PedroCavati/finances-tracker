@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react';
 let version = 0;
 const listeners = new Set<() => void>();
 
+/** Chame depois de gravar no banco: todas as telas abertas refazem suas consultas. */
 export function notifyDataChanged() {
   version += 1;
   listeners.forEach((listener) => listener());
@@ -19,6 +20,7 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** Versão atual dos dados; o componente renderiza de novo quando ela sobe. */
 export function useDataVersion() {
   return useSyncExternalStore(
     subscribe,

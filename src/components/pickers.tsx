@@ -9,6 +9,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { addDays, formatDayLabel, formatShortDate, today } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 
+// ─── Valor ────────────────────────────────────────────────────────────────────
+
 /** Campo de valor: cada dígito entra pela direita (R$ 0,01 → R$ 0,12 → R$ 1,23) e apagar remove o último. */
 export function AmountInput({
   value,
@@ -59,6 +61,8 @@ export function AmountInput({
     </View>
   );
 }
+
+// ─── Cor e ícone ──────────────────────────────────────────────────────────────
 
 /** Grade com as cores de `SWATCHES` para categorias e contas. */
 export function SwatchPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
@@ -119,6 +123,8 @@ export function IconPicker({
   );
 }
 
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
 /** Escolha de data sem calendário nativo: atalhos Hoje/Ontem e setas de um dia. */
 export function DateField({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const theme = useTheme();
@@ -134,7 +140,7 @@ export function DateField({ value, onChange }: { value: string; onChange: (iso: 
         <SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={16} tintColor={theme.text} />
       </Pressable>
       <View style={styles.dateLabel}>
-        <ThemedText type="smallBold">{formatDayLabel(value)}</ThemedText>
+        <ThemedText type="smallBold">{formatDayLabel(value, { short: true })}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {formatShortDate(value)}
         </ThemedText>
@@ -154,7 +160,10 @@ export function DateField({ value, onChange }: { value: string; onChange: (iso: 
   );
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // Valor
   amount: {
     fontSize: 40,
     fontWeight: 700,
@@ -166,6 +175,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     color: 'transparent',
   },
+
+  // Cor e ícone
   wrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -186,6 +197,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
+
+  // Data
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',

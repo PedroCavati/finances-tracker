@@ -29,6 +29,7 @@ export function MonthSwitcher({
   );
 }
 
+/** Seta de mês anterior ou próximo. */
 function Arrow({ direction, onPress }: { direction: 'left' | 'right'; onPress: () => void }) {
   const theme = useTheme();
   const name =

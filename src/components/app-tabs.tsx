@@ -3,6 +3,7 @@ import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
+/** Barra de abas nativa (iOS/Android). Cada `Trigger` aponta para um arquivo em `app/(tabs)/`. */
 export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];

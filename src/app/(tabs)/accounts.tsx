@@ -13,21 +13,29 @@ import { useTheme } from '@/hooks/use-theme';
 import { today } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 
+// ─── Tela ─────────────────────────────────────────────────────────────────────
+
 /** Aba Contas: saldo de cada conta e o total. Tocar numa conta abre o formulário dela. */
 export default function AccountsScreen() {
   const theme = useTheme();
   const date = today();
+
+  // Dados do banco (inclui as arquivadas)
   const { data: accounts } = useQuery((db) => listAccounts(db, date, true), date);
 
+  // Valores calculados. O total só soma as contas ativas.
   const active = accounts?.filter((a) => !a.archived) ?? [];
   const archived = accounts?.filter((a) => a.archived) ?? [];
   const total = active.reduce((sum, a) => sum + a.balance, 0);
+
+  // Ações
   const newAccount = () => router.push('/account');
 
   return (
     <Screen
       title="Contas"
       actions={<IconButton icon={{ ios: 'plus', android: 'add', web: 'add' }} label="Nova conta" onPress={newAccount} filled />}>
+      {/* Saldo total */}
       <Card style={styles.totalCard}>
         <ThemedText type="small" themeColor="textSecondary">
           Saldo total
@@ -37,6 +45,7 @@ export default function AccountsScreen() {
         </ThemedText>
       </Card>
 
+      {/* Contas ativas */}
       {accounts && active.length === 0 && (
         <EmptyState
           title="Nenhuma conta"
@@ -47,6 +56,7 @@ export default function AccountsScreen() {
 
       {active.length > 0 && <AccountGroup accounts={active} />}
 
+      {/* Contas arquivadas */}
       {archived.length > 0 && (
         <>
           <SectionTitle>Arquivadas</SectionTitle>
@@ -57,6 +67,9 @@ export default function AccountsScreen() {
   );
 }
 
+// ─── Lista ────────────────────────────────────────────────────────────────────
+
+/** Card com as contas de um grupo, separadas por linhas. Tocar numa abre a edição. */
 function AccountGroup({ accounts }: { accounts: AccountWithBalance[] }) {
   const theme = useTheme();
   return (
@@ -84,6 +97,8 @@ function AccountGroup({ accounts }: { accounts: AccountWithBalance[] }) {
     </Card>
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   totalCard: {

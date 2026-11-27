@@ -13,6 +13,7 @@ import { formatSignedMoney } from '@/lib/money';
 /** Lista de lançamentos agrupada por dia, com o total do dia (sem transferências). */
 export function TransactionList({ items, accountId }: { items: Row[]; accountId?: number }) {
   const theme = useTheme();
+  // Agrupa por dia. A lista chega ordenada por data, então basta comparar com o último grupo.
   const groups: { date: string; items: Row[]; net: number }[] = [];
   for (const item of items) {
     let group = groups[groups.length - 1];

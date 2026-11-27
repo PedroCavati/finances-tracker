@@ -7,6 +7,11 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+/**
+ * Cores por tema. `background*` são fundos (tela, cartões, item selecionado); `tint` é a cor
+ * de destaque e `onTint` o texto sobre ela; `income`, `expense`, `transfer` e `warning`
+ * marcam receitas, despesas, transferências e alertas de orçamento.
+ */
 export const Colors = {
   light: {
     text: '#000000',
@@ -38,8 +43,10 @@ export const Colors = {
   },
 } as const;
 
+/** Nome de uma cor do tema, ex.: 'textSecondary'. */
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** Famílias de fonte por plataforma. */
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

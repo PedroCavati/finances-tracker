@@ -31,6 +31,7 @@ export function useQuery<T>(query: (db: SQLiteDatabase) => Promise<T>, key: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, key, version]);
 
+  // `data` mantém o resultado anterior enquanto a nova consulta roda, para a tela não piscar.
   return {
     data: state.data,
     error: state.error,

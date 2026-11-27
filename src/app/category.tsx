@@ -16,13 +16,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { monthKey, today } from '@/lib/dates';
 import { ensureNotificationPermission } from '@/lib/notifications';
 
+// ─── Tela ─────────────────────────────────────────────────────────────────────
+
 /** Modal de categoria. Sem `id`, cria (o `kind` opcional escolhe o tipo); com `id`, edita, define o limite mensal ou apaga. */
 export default function CategoryForm() {
   const db = useSQLiteContext();
   const theme = useTheme();
+
+  // Parâmetros da rota
   const params = useLocalSearchParams<{ id?: string; kind?: CategoryKind }>();
   const id = params.id ? Number(params.id) : undefined;
 
+  // Campos da categoria
   const [loaded, setLoaded] = useState(!id);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CategoryKind>(params.kind ?? 'expense');
@@ -30,16 +35,22 @@ export default function CategoryForm() {
   const [icon, setIcon] = useState('other');
   const [parentId, setParentId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Limite mensal. `savedBudget` é o que está no banco, para só gravar se mudou.
   const [budgetAmount, setBudgetAmount] = useState(0);
   const [savedBudget, setSavedBudget] = useState(0);
   const [amountFocused, setAmountFocused] = useState(false);
 
+
+  // Dados do banco e valores calculados
   const { data: all } = useQuery((d) => listCategories(d, kind), kind);
   // Só um nível de subcategoria: a mãe tem que ser de topo e não pode ser a própria.
   const parentOptions = (all ?? []).filter((c) => c.parent_id === null && c.id !== id);
   const hasChildren = !!id && (all ?? []).some((c) => c.parent_id === id);
+  // Limite só em categorias principais de despesa (a subcategoria entra no limite da principal).
   const canHaveBudget = kind === 'expense' && parentId === null;
 
+  // Preenche os campos ao editar, junto com o limite do mês atual.
   useEffect(() => {
     if (!id) return;
     Promise.all([getCategory(db, id), getBudget(db, id, monthKey(today()))]).then(
@@ -58,8 +69,12 @@ export default function CategoryForm() {
     );
   }, [db, id]);
 
+  // Validação
   const canSave = name.trim().length > 0 && !saving;
 
+  // ── Ações ──
+
+  /** Salva a categoria e, se mudou, o limite (a partir do mês atual). */
   async function onSave() {
     if (!canSave) return;
     setSaving(true);
@@ -101,6 +116,9 @@ export default function CategoryForm() {
     );
   }
 
+  // ── Formulário ──
+
+  // Enquanto carrega, só o cabeçalho.
   if (!loaded) return <Stack.Screen options={{ title: 'Categoria' }} />;
 
   return (
@@ -112,6 +130,7 @@ export default function CategoryForm() {
         }}
       />
       <FormScroll keyboardAware={!amountFocused}>
+        {/* Nome */}
         <Field label="Nome">
           <TextField value={name} onChangeText={setName} placeholder="Ex.: Restaurantes" autoFocus={!id} />
         </Field>
@@ -133,6 +152,7 @@ export default function CategoryForm() {
           </Field>
         )}
 
+        {/* Categoria principal. Some se esta já tem subcategorias (só um nível). */}
         {!hasChildren && (
           <Field label="Subcategoria de">
             <View style={styles.wrap}>
@@ -151,6 +171,7 @@ export default function CategoryForm() {
           </Field>
         )}
 
+        {/* Limite mensal */}
         {canHaveBudget && (
           <Field label="Limite mensal">
             <AmountInput value={budgetAmount} onChange={setBudgetAmount} onFocusChange={setAmountFocused} />
@@ -162,6 +183,7 @@ export default function CategoryForm() {
           </Field>
         )}
 
+        {/* Aparência */}
         <Field label="Cor">
           <SwatchPicker value={color} onChange={setColor} />
         </Field>
@@ -170,6 +192,7 @@ export default function CategoryForm() {
           <IconPicker icons={CATEGORY_ICON_KEYS} value={icon} color={color} onChange={setIcon} />
         </Field>
 
+        {/* Botões */}
         <View style={styles.actions}>
           <Button title="Salvar" onPress={onSave} disabled={!canSave} />
           {id && <Button title="Apagar categoria" variant="danger" onPress={onDelete} />}
@@ -178,6 +201,8 @@ export default function CategoryForm() {
     </>
   );
 }
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   wrap: {

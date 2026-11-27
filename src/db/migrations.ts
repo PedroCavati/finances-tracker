@@ -107,7 +107,47 @@ const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       );
     `);
   },
+
+  // 3: lançamentos recorrentes
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE recurrences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL CHECK (kind IN ('income', 'expense', 'transfer')),
+        amount INTEGER NOT NULL CHECK (amount > 0),
+        description TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        to_account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        frequency TEXT NOT NULL CHECK (frequency IN ('weekly', 'monthly', 'yearly')),
+        anchor_date TEXT NOT NULL,
+        next_date TEXT NOT NULL,
+        auto INTEGER NOT NULL DEFAULT 1 CHECK (auto IN (0, 1)),
+        paused INTEGER NOT NULL DEFAULT 0 CHECK (paused IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX idx_recurrences_next ON recurrences(next_date);
+
+      ALTER TABLE transactions
+        ADD COLUMN recurrence_id INTEGER REFERENCES recurrences(id) ON DELETE SET NULL;
+    `);
+  },
+
+  // 4: dias úteis nas recorrências e aviso por notificação
+  async (db) => {
+    await db.execAsync(`
+      ALTER TABLE recurrences ADD COLUMN business_days TEXT NOT NULL DEFAULT 'none'
+        CHECK (business_days IN ('none', 'next', 'previous'));
+      ALTER TABLE recurrences ADD COLUMN business_day_n INTEGER
+        CHECK (business_day_n BETWEEN 1 AND 23);
+      ALTER TABLE recurrences ADD COLUMN notify INTEGER NOT NULL DEFAULT 0
+        CHECK (notify IN (0, 1));
+    `);
+  },
 ];
+
 
 /** Roda as migrações pendentes. É chamado pelo SQLiteProvider antes de qualquer tela abrir. */
 export async function migrate(db: SQLiteDatabase) {
