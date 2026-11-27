@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui';
@@ -42,9 +43,21 @@ export function TransactionRow({ item, accountId }: { item: Row; accountId?: num
       />
       <View style={styles.text}>
         <ThemedText numberOfLines={1}>{title}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-          {subtitle}
-        </ThemedText>
+        <View style={styles.subtitle}>
+          {/* Gerado por uma recorrência (some se a recorrência for apagada) */}
+          {item.recurrence_id !== null && (
+            <SymbolView
+              name={{ ios: 'repeat', android: 'repeat', web: 'repeat' }}
+              size={12}
+              tintColor={theme.textSecondary}
+              accessibilityLabel="Recorrente"
+            />
+          )}
+
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.subtitleText}>
+            {subtitle}
+          </ThemedText>
+        </View>
       </View>
       <ThemedText style={[styles.amount, { color }]}>
         {sign}
@@ -64,6 +77,14 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     minWidth: 0,
+  },
+  subtitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  subtitleText: {
+    flexShrink: 1,
   },
   amount: {
     fontWeight: 600,

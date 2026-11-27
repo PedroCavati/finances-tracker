@@ -47,7 +47,7 @@ export function actualDate(schedule: Schedule, nominal: string) {
  */
 export function occurrencesUntil(schedule: Schedule, fromNominal: string, until: string) {
   const result: { nominal: string; date: string }[] = [];
-  for (let nominal = fromNominal; ; ) {
+  for (let nominal = fromNominal; ;) {
     const date = actualDate(schedule, nominal);
     if (date > until) return result;
     result.push({ nominal, date });
@@ -64,6 +64,7 @@ export function occurrencesUntil(schedule: Schedule, fromNominal: string, until:
  */
 export async function runDueRecurrences(db: SQLiteDatabase) {
   const now = today();
+  let generated = 0;
   const generatedExpenses: { categoryId: number | null; date: string }[] = [];
 
   await db.withExclusiveTransactionAsync(async (tx) => {
@@ -74,6 +75,7 @@ export async function runDueRecurrences(db: SQLiteDatabase) {
       if (due.length === 0) continue;
       for (const { date } of due) {
         await insertRecurrenceTransaction(tx, rec, date);
+        generated += 1;
         if (rec.kind === 'expense') generatedExpenses.push({ categoryId: rec.category_id, date });
       }
       const lastNominal = due[due.length - 1].nominal;
@@ -81,11 +83,11 @@ export async function runDueRecurrences(db: SQLiteDatabase) {
     }
   });
 
-  if (generatedExpenses.length === 0) return;
+  if (generated === 0) return;
   notifyDataChanged();
   // Fora da transação: o aviso consulta o banco e pode pedir notificação.
   for (const { categoryId, date } of generatedExpenses) {
-    await checkBudgetAlert(db, categoryId, date).catch(() => {});
+    await checkBudgetAlert(db, categoryId, date).catch(() => { });
   }
 }
 

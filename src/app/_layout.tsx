@@ -1,19 +1,16 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { Suspense } from 'react';
 import { useColorScheme } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { RecurrenceRunner } from '@/components/recurrence-runner';
 import { Colors } from '@/constants/theme';
 import { migrate } from '@/db/migrations';
 import { configureNotifications } from '@/lib/notifications';
 import { runDueRecurrences } from '@/lib/recurrences';
 
-// Antes da primeira tela: segura a splash (a AnimatedSplashOverlay esconde) e prepara as notificações.
-SplashScreen.preventAutoHideAsync();
+// Antes da primeira tela: prepara as notificações.
 configureNotifications();
 
 /** Na abertura do app: primeiro atualiza o banco, depois gera os recorrentes que venceram. */
@@ -52,7 +49,6 @@ export default function RootLayout() {
           </SQLiteProvider>
         </Suspense>
       </KeyboardProvider>
-      <AnimatedSplashOverlay />
     </ThemeProvider>
   );
 }
