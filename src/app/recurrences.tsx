@@ -117,6 +117,7 @@ function RecurrenceItem({ rec }: { rec: RecurrenceRow }) {
             ? 'Pausada'
             : `Próxima: ${formatDayLabel(actualDate(rec, rec.next_date), { short: true })}`}
           {rec.auto ? '' : ' · pede confirmação'}
+          {rec.notify ? ' · com lembrete' : ''}
         </ThemedText>
       </View>
       <ThemedText style={[styles.amount, { color }]}>

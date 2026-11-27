@@ -3,7 +3,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 /** Canal do Android para os avisos do app. No iOS, canais não existem. */
-const CHANNEL_ID = 'alerts';
+export const CHANNEL_ID = 'alerts';
 
 /**
  * Configuração inicial. Chamar uma vez, na abertura do app.

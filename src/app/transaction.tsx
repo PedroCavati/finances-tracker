@@ -18,6 +18,7 @@ import {
   saveRecurrence,
   saveTransaction,
 } from '@/db/queries';
+import { ensureNotificationPermission } from '@/lib/notifications';
 import {
   BUSINESS_DAY_LABELS,
   FREQUENCY_LABELS,
@@ -92,6 +93,7 @@ export default function TransactionForm() {
   const [recurrence, setRecurrence] = useState<Recurrence | null>(null);
   const [repeat, setRepeat] = useState<Frequency | null>(params.repeat ?? null);
   const [auto, setAuto] = useState(true);
+  const [notify, setNotify] = useState(false);
   const [businessDays, setBusinessDays] = useState<BusinessDayRule>('none');
   const [businessDayN, setBusinessDayN] = useState<number | null>(null);
 
@@ -129,6 +131,7 @@ export default function TransactionForm() {
           setCategoryId(rec.category_id);
           setRepeat(rec.frequency);
           setAuto(rec.auto === 1);
+          setNotify(rec.notify === 1);
           setBusinessDays(rec.business_days);
           setBusinessDayN(rec.business_day_n);
           // Confirmar: a data da ocorrência. Editar: a próxima data da regra.
@@ -171,11 +174,11 @@ export default function TransactionForm() {
   // Regra que vai ser salva, com a primeira data nominal já normalizada.
   const schedule = isRecurring
     ? {
-        frequency: repeat,
-        business_days: usesBusinessDayN ? ('none' as const) : businessDays,
-        business_day_n: usesBusinessDayN ? businessDayN : null,
-        anchor_date: firstNominal(date, usesBusinessDayN ? businessDayN : null),
-      }
+      frequency: repeat,
+      business_days: usesBusinessDayN ? ('none' as const) : businessDays,
+      business_day_n: usesBusinessDayN ? businessDayN : null,
+      anchor_date: firstNominal(date, usesBusinessDayN ? businessDayN : null),
+    }
     : null;
 
   // ── Ações ──
@@ -213,6 +216,10 @@ export default function TransactionForm() {
           recurrence.business_day_n === schedule.business_day_n &&
           recurrence.next_date === date;
         const anchor = sameSchedule ? recurrence.anchor_date : schedule.anchor_date;
+
+        // O lembrete precisa de permissão. Pede antes de salvar: o reagendamento roda logo depois de gravar e precisa encontrar a permissão já dada.
+        if (notify) await ensureNotificationPermission();
+
         await saveRecurrence(
           db,
           {
@@ -222,7 +229,7 @@ export default function TransactionForm() {
             next_date: sameSchedule ? recurrence.next_date : anchor,
             auto: auto ? 1 : 0,
             paused: recurrence?.paused ?? 0,
-            notify: recurrence?.notify ?? 0,
+            notify: notify ? 1 : 0,
           },
           recurrenceId
         );
@@ -233,7 +240,7 @@ export default function TransactionForm() {
       }
       if (kind === 'expense' && !schedule) {
         // Sem await: o modal fecha na hora e o aviso chega logo depois.
-        checkBudgetAlert(db, categoryId, date).catch(() => {});
+        checkBudgetAlert(db, categoryId, date).catch(() => { });
       }
       router.back();
     } catch (error) {
@@ -509,6 +516,17 @@ export default function TransactionForm() {
                 />
               </Field>
             )}
+
+            <Field label="Lembrete">
+              <Segmented
+                value={notify ? 'on' : 'off'}
+                onChange={(v) => setNotify(v === 'on')}
+                options={[
+                  { value: 'off', label: 'Não avisar' },
+                  { value: 'on', label: 'Avisar no dia, 9h' },
+                ]}
+              />
+            </Field>
 
             <Field label="Ao chegar a data">
               <Segmented
