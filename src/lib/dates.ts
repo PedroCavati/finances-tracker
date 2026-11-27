@@ -4,15 +4,18 @@ function pad(n: number) {
   return String(n).padStart(2, '0');
 }
 
+/** Date → "2026-11-26", no fuso local. */
 export function toISODate(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** "2026-11-26" → Date à meia-noite local, sem conversão de fuso. */
 export function parseISODate(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
+/** Data de hoje no formato "2026-11-26". */
 export function today() {
   return toISODate(new Date());
 }
@@ -22,6 +25,7 @@ export function monthKey(iso: string) {
   return iso.slice(0, 7);
 }
 
+/** Soma (ou subtrai, com número negativo) dias a uma data. */
 export function addDays(iso: string, days: number) {
   const date = parseISODate(iso);
   date.setDate(date.getDate() + days);

@@ -48,6 +48,7 @@ function periodRange(period: Period, now: string): { start?: string; end?: strin
   }
 }
 
+/** Aba Lançamentos: histórico com busca e filtros. O parâmetro `accountId` abre já filtrado por uma conta. */
 export default function TransactionsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ accountId?: string }>();

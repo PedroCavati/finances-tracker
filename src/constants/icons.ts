@@ -31,10 +31,12 @@ export const ICONS = {
 
 export type IconKey = keyof typeof ICONS;
 
+/** Ícone a partir da chave salva no banco. Chaves desconhecidas viram "other". */
 export function iconFor(key: string | null | undefined): SymbolViewProps['name'] {
   return ICONS[(key ?? 'other') as IconKey] ?? ICONS.other;
 }
 
+/** Ícones oferecidos no formulário de categoria. */
 export const CATEGORY_ICON_KEYS: IconKey[] = [
   'food',
   'groceries',
@@ -55,6 +57,7 @@ export const CATEGORY_ICON_KEYS: IconKey[] = [
   'other',
 ];
 
+/** Ícones oferecidos no formulário de conta. */
 export const ACCOUNT_ICON_KEYS: IconKey[] = ['bank', 'wallet', 'card', 'piggy', 'invest', 'other'];
 
 /** Cores para categorias e contas. Funcionam sobre fundo claro e escuro. */

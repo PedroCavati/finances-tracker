@@ -26,6 +26,7 @@ const DEFAULT_ICON: Record<AccountType, string> = {
   investment: 'invest',
 };
 
+/** Modal de conta. Sem `id`, cria; com `id`, edita, arquiva ou apaga. */
 export default function AccountForm() {
   const db = useSQLiteContext();
   const theme = useTheme();
@@ -36,6 +37,7 @@ export default function AccountForm() {
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
   const [balance, setBalance] = useState(0);
+  const [amountFocused, setAmountFocused] = useState(false);
   const [negative, setNegative] = useState(false);
   const [color, setColor] = useState('#0090FF');
   const [icon, setIcon] = useState('bank');
@@ -111,7 +113,7 @@ export default function AccountForm() {
           headerLeft: () => <HeaderButton title="Cancelar" onPress={() => router.back()} />,
         }}
       />
-      <FormScroll>
+      <FormScroll keyboardAware={!amountFocused}>
         <Field label="Nome">
           <TextField value={name} onChangeText={setName} placeholder="Ex.: Nubank, Itaú, Carteira" autoFocus={!id} />
         </Field>
@@ -141,7 +143,12 @@ export default function AccountForm() {
               { value: 'neg', label: 'Negativo / dívida', color: theme.expense },
             ]}
           />
-          <AmountInput value={balance} onChange={setBalance} color={negative ? theme.expense : undefined} />
+          <AmountInput
+            value={balance}
+            onChange={setBalance}
+            color={negative ? theme.expense : undefined}
+            onFocusChange={setAmountFocused}
+          />
         </Field>
 
         <Field label="Cor">

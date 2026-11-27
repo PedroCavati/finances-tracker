@@ -13,6 +13,7 @@ import { configureNotifications } from '@/lib/notifications';
 SplashScreen.preventAutoHideAsync();
 configureNotifications();
 
+/** Raiz do app: tema, teclado, banco de dados (com as migrações) e a pilha com as abas e os modais. */
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];

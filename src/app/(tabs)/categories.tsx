@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { monthKey, monthRange, today } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 
+/** Aba Categorias: categorias e subcategorias, com o orçamento do mês nas de despesa. */
 export default function CategoriesScreen() {
   const theme = useTheme();
   const [kind, setKind] = useState<CategoryKind>('expense');
@@ -31,7 +32,6 @@ export default function CategoriesScreen() {
   const parents = categories?.filter((c) => c.parent_id === null) ?? [];
   const childrenOf = (id: number) => categories?.filter((c) => c.parent_id === id) ?? [];
 
-  // Orçamento só existe para despesas.
   const progressById = new Map((progress ?? []).map((p) => [p.category_id, p]));
   const withBudget = (progress ?? []).filter((p) => p.budget > 0);
   const totalBudget = withBudget.reduce((sum, p) => sum + p.budget, 0);

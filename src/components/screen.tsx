@@ -46,7 +46,15 @@ export function Screen({
 }
 
 /** Conteúdo rolável dos formulários apresentados como modal. */
-export function FormScroll({ children }: { children: ReactNode }) {
+/** Conteúdo rolável dos formulários apresentados como modal. */
+export function FormScroll({
+  children,
+  keyboardAware = true,
+}: {
+  children: ReactNode;
+  /** false desliga a rolagem automática para o campo em foco (ver AmountInput). */
+  keyboardAware?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   return (
@@ -56,7 +64,8 @@ export function FormScroll({ children }: { children: ReactNode }) {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       contentInsetAdjustmentBehavior="automatic"
-      bottomOffset={Spacing.four}>
+      bottomOffset={Spacing.four}
+      enabled={keyboardAware}>
       <View style={[styles.inner, { gap: Spacing.four }]}>{children}</View>
     </KeyboardAwareScrollView>
   );

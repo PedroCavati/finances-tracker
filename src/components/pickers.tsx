@@ -15,11 +15,18 @@ export function AmountInput({
   onChange,
   color,
   autoFocus,
+  onFocusChange,
 }: {
   value: number;
   onChange: (cents: number) => void;
   color?: string;
   autoFocus?: boolean;
+  /**
+   * Avisa quando o campo ganha ou perde o foco. Use para desligar o `keyboardAware`
+   * do FormScroll: cada tecla muda o texto por um instante, e a rolagem automática
+   * que isso dispara faz o próximo toque na tela ser ignorado.
+   */
+  onFocusChange?: (focused: boolean) => void;
 }) {
   const theme = useTheme();
 
@@ -30,11 +37,20 @@ export function AmountInput({
       <TextInput
         accessibilityLabel={`Valor, ${formatMoney(value)}`}
         value=""
+        onChangeText={(text) => {
+          // Dígitos digitados ou colados entram pela direita, um por um.
+          let next = value;
+          for (const digit of text.replace(/\D/g, '')) {
+            if (next < 1e11) next = next * 10 + Number(digit);
+          }
+          if (next !== value) onChange(next);
+        }}
         onKeyPress={({ nativeEvent: { key } }) => {
           if (key === 'Backspace') onChange(Math.floor(value / 10));
-          else if (/^\d$/.test(key) && value < 1e11) onChange(value * 10 + Number(key));
         }}
         keyboardType="number-pad"
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
         autoFocus={autoFocus}
         caretHidden
         contextMenuHidden
@@ -44,6 +60,7 @@ export function AmountInput({
   );
 }
 
+/** Grade com as cores de `SWATCHES` para categorias e contas. */
 export function SwatchPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
   const theme = useTheme();
   return (
@@ -65,6 +82,7 @@ export function SwatchPicker({ value, onChange }: { value: string; onChange: (co
   );
 }
 
+/** Grade de ícones. O selecionado aparece na cor escolhida. */
 export function IconPicker({
   icons,
   value,

@@ -8,6 +8,7 @@ import type { TransactionRow as Row } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney } from '@/lib/money';
 
+/** Linha de um lançamento. Com `accountId`, transferências mostram o sinal de entrada ou saída daquela conta. */
 export function TransactionRow({ item, accountId }: { item: Row; accountId?: number }) {
   const theme = useTheme();
 

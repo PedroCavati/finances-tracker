@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { monthKey, monthRange, today } from '@/lib/dates';
 import { formatMoney, formatSignedMoney } from '@/lib/money';
 
+/** Aba Início: saldo total, resumo e orçamento do mês e últimos lançamentos. */
 export default function HomeScreen() {
   const theme = useTheme();
   const now = today();

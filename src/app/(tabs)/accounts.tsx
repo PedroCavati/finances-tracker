@@ -13,6 +13,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { today } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 
+/** Aba Contas: saldo de cada conta e o total. Tocar numa conta abre o formulário dela. */
 export default function AccountsScreen() {
   const theme = useTheme();
   const date = today();

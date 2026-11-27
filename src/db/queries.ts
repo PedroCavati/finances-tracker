@@ -34,6 +34,7 @@ const BALANCE_SQL = `
   ), 0)
 `;
 
+/** Contas com o saldo calculado até `untilDate`. As arquivadas só vêm com `includeArchived`. */
 export function listAccounts(db: SQLiteDatabase, untilDate: string, includeArchived = false) {
   return db.getAllAsync<AccountWithBalance>(
     `SELECT a.*, ${BALANCE_SQL} AS balance
@@ -48,6 +49,7 @@ export function getAccount(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Account>('SELECT * FROM accounts WHERE id = ?', id);
 }
 
+/** Cria a conta (sem `id`) ou atualiza a existente (com `id`). */
 export async function saveAccount(db: SQLiteDatabase, input: AccountInput, id?: number) {
   if (id) {
     await db.runAsync(
@@ -72,11 +74,13 @@ export async function saveAccount(db: SQLiteDatabase, input: AccountInput, id?: 
   notifyDataChanged();
 }
 
+/** Arquiva ou desarquiva: a conta some das listas e do saldo total, mas o histórico continua. */
 export async function setAccountArchived(db: SQLiteDatabase, id: number, archived: boolean) {
   await db.runAsync('UPDATE accounts SET archived = ? WHERE id = ?', archived ? 1 : 0, id);
   notifyDataChanged();
 }
 
+/** Quantos lançamentos envolvem a conta, para avisar antes de apagá-la. */
 export async function countAccountTransactions(db: SQLiteDatabase, id: number) {
   const row = await db.getFirstAsync<{ n: number }>(
     'SELECT COUNT(*) AS n FROM transactions WHERE account_id = ? OR to_account_id = ?',
@@ -94,6 +98,7 @@ export async function deleteAccount(db: SQLiteDatabase, id: number) {
 
 // ─── Categorias ────────────────────────────────────────────────────────────
 
+/** Categorias e subcategorias de um tipo, ou de todos se `kind` não for informado. */
 export function listCategories(db: SQLiteDatabase, kind?: CategoryKind) {
   return db.getAllAsync<Category>(
     `SELECT * FROM categories ${kind ? 'WHERE kind = ?' : ''}
@@ -140,6 +145,7 @@ export async function deleteCategory(db: SQLiteDatabase, id: number) {
 
 // ─── Lançamentos ───────────────────────────────────────────────────────────
 
+/** Filtros do histórico. Campos não informados não filtram. */
 export type TransactionFilters = {
   search?: string;
   start?: string;
@@ -151,6 +157,7 @@ export type TransactionFilters = {
   limit?: number;
 };
 
+/** Lançamentos com os nomes de conta e categoria resolvidos, do mais recente ao mais antigo. */
 export function listTransactions(db: SQLiteDatabase, filters: TransactionFilters = {}) {
   const where: string[] = [];
   const params: SQLiteBindValue[] = [];
@@ -207,6 +214,7 @@ export function getTransaction(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Transaction>('SELECT * FROM transactions WHERE id = ?', id);
 }
 
+/** Cria ou atualiza o lançamento. Transferências ignoram a categoria; receitas e despesas ignoram a conta de destino. */
 export async function saveTransaction(db: SQLiteDatabase, input: TransactionInput, id?: number) {
   const isTransfer = input.kind === 'transfer';
   const values = [

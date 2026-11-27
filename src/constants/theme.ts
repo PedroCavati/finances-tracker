@@ -1,6 +1,6 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
+ * Tokens visuais do app: cores (tema claro e escuro), fontes e espaçamentos.
+ * Nos componentes, use as cores via `useTheme()` em vez de valores soltos.
  */
 
 import '@/global.css';
@@ -65,6 +65,7 @@ export const Fonts = Platform.select({
   },
 });
 
+/** Escala de espaçamento, em pontos. Prefira estes valores a números soltos. */
 export const Spacing = {
   half: 2,
   one: 4,
@@ -75,5 +76,7 @@ export const Spacing = {
   six: 64,
 } as const;
 
+/** Altura da barra de abas, descontada à mão no Android (no iOS o sistema já reserva o espaço). */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** Largura máxima do conteúdo em telas largas (tablet e web). */
 export const MaxContentWidth = 800;

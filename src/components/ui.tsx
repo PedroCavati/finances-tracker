@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 // ─── Cartão ────────────────────────────────────────────────────────────────
 
+/** Fundo arredondado que agrupa conteúdo. */
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
   return (
@@ -27,6 +28,7 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
   );
 }
 
+/** Título de seção em caixa alta, com um elemento opcional à direita (ex.: "Ver todos"). */
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <View style={styles.sectionTitle}>
@@ -46,6 +48,7 @@ type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   style?: StyleProp<ViewStyle>;
 };
 
+/** Botão de largura livre: principal (`primary`), secundário ou de ação destrutiva (`danger`). */
 export function Button({ title, variant = 'primary', disabled, style, ...rest }: ButtonProps) {
   const theme = useTheme();
   const background =
@@ -68,6 +71,7 @@ export function Button({ title, variant = 'primary', disabled, style, ...rest }:
   );
 }
 
+/** Botão redondo só com ícone. O `label` é o que o leitor de tela anuncia. */
 export function IconButton({
   icon,
   label,
@@ -107,6 +111,7 @@ export function HeaderButton({ title, onPress, bold }: { title: string; onPress:
 
 // ─── Chips ─────────────────────────────────────────────────────────────────
 
+/** Pílula selecionável. Com `color`, fica dessa cor quando selecionada. */
 export function Chip({
   label,
   selected,
@@ -186,6 +191,7 @@ export function Segmented<T extends string>({
 
 // ─── Campos ────────────────────────────────────────────────────────────────
 
+/** Rótulo acima de um campo de formulário. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={styles.field}>
@@ -197,6 +203,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
+/** Campo de texto com o visual do app. Aceita as mesmas props do TextInput. */
 export function TextField(props: TextInputProps) {
   const theme = useTheme();
   return (
@@ -214,6 +221,7 @@ export function TextField(props: TextInputProps) {
 
 // ─── Ícone de categoria/conta ──────────────────────────────────────────────
 
+/** Ícone num círculo com fundo translúcido da cor da categoria ou conta. */
 export function Badge({ icon, color, size = 40 }: { icon: string | null; color: string | null; size?: number }) {
   const theme = useTheme();
   const tint = color ?? theme.textSecondary;
@@ -230,6 +238,7 @@ export function Badge({ icon, color, size = 40 }: { icon: string | null; color: 
 
 // ─── Estado vazio ──────────────────────────────────────────────────────────
 
+/** Mensagem para listas vazias, com uma ação opcional. */
 export function EmptyState({ title, message, action }: { title: string; message?: string; action?: ReactNode }) {
   return (
     <View style={styles.empty}>

@@ -21,6 +21,7 @@ const KIND_TITLES: Record<TransactionKind, string> = {
   transfer: 'transferência',
 };
 
+/** Modal de lançamento. Sem `id`, cria (o `kind` opcional escolhe despesa, receita ou transferência); com `id`, edita ou apaga. */
 export default function TransactionForm() {
   const db = useSQLiteContext();
   const theme = useTheme();
@@ -30,6 +31,7 @@ export default function TransactionForm() {
   const [loaded, setLoaded] = useState(!id);
   const [kind, setKind] = useState<TransactionKind>(params.kind ?? 'expense');
   const [amount, setAmount] = useState(0);
+  const [amountFocused, setAmountFocused] = useState(false);
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(today());
@@ -73,6 +75,7 @@ export default function TransactionForm() {
   const selected = kindCategories.find((c) => c.id === categoryId);
   const selectedParentId = selected ? (selected.parent_id ?? selected.id) : null;
   const subcategories = kindCategories.filter((c) => c.parent_id !== null && c.parent_id === selectedParentId);
+  const selectedParent = parents.find((c) => c.id === selectedParentId);
 
   const isTransfer = kind === 'transfer';
   const validTransfer = !isTransfer || (toAccountId !== null && toAccountId !== effectiveAccountId);
@@ -166,7 +169,7 @@ export default function TransactionForm() {
   return (
     <>
       {header}
-      <FormScroll>
+      <FormScroll keyboardAware={!amountFocused}>
         <Segmented
           value={kind}
           onChange={changeKind}
@@ -177,7 +180,7 @@ export default function TransactionForm() {
           ]}
         />
 
-        <AmountInput value={amount} onChange={setAmount} color={amountColor} autoFocus={!id} />
+        <AmountInput value={amount} onChange={setAmount} color={amountColor} autoFocus={!id} onFocusChange={setAmountFocused} />
 
         <Field label="Descrição">
           <TextField
@@ -202,20 +205,28 @@ export default function TransactionForm() {
                 />
               ))}
             </View>
-            {subcategories.length > 0 && (
-              <View style={[styles.wrap, styles.subRow]}>
-                {subcategories.map((c) => (
-                  <Chip
-                    key={c.id}
-                    label={c.name}
-                    icon={c.icon}
-                    color={c.color}
-                    selected={categoryId === c.id}
-                    onPress={() => setCategoryId(categoryId === c.id ? selectedParentId : c.id)}
-                  />
-                ))}
-              </View>
-            )}
+          </Field>
+        )}
+
+        {!isTransfer && selectedParent && subcategories.length > 0 && (
+          <Field label={`Subcategoria de ${selectedParent.name}`}>
+            <View style={styles.wrap}>
+              <Chip
+                label="Nenhuma"
+                selected={categoryId === selectedParent.id}
+                onPress={() => setCategoryId(selectedParent.id)}
+              />
+              {subcategories.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.name}
+                  icon={c.icon}
+                  color={c.color}
+                  selected={categoryId === c.id}
+                  onPress={() => setCategoryId(c.id)}
+                />
+              ))}
+            </View>
           </Field>
         )}
 
@@ -286,9 +297,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
-  },
-  subRow: {
-    marginTop: Spacing.one,
   },
   notes: {
     minHeight: 80,

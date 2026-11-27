@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { monthKey, today } from '@/lib/dates';
 import { ensureNotificationPermission } from '@/lib/notifications';
 
+/** Modal de categoria. Sem `id`, cria (o `kind` opcional escolhe o tipo); com `id`, edita, define o limite mensal ou apaga. */
 export default function CategoryForm() {
   const db = useSQLiteContext();
   const theme = useTheme();
@@ -31,6 +32,7 @@ export default function CategoryForm() {
   const [saving, setSaving] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState(0);
   const [savedBudget, setSavedBudget] = useState(0);
+  const [amountFocused, setAmountFocused] = useState(false);
 
   const { data: all } = useQuery((d) => listCategories(d, kind), kind);
   // Só um nível de subcategoria: a mãe tem que ser de topo e não pode ser a própria.
@@ -71,7 +73,7 @@ export default function CategoryForm() {
       if (newBudget !== savedBudget) {
         await setBudget(db, categoryId, newBudget, monthKey(today()));
       }
-      // É aqui que os avisos passam a fazer sentido: pede permissão (só pergunta uma vez).
+      // Os avisos de orçamento precisam de permissão; o sistema só pergunta uma vez.
       if (newBudget > 0) await ensureNotificationPermission();
       router.back();
     } catch (error) {
@@ -109,7 +111,7 @@ export default function CategoryForm() {
           headerLeft: () => <HeaderButton title="Cancelar" onPress={() => router.back()} />,
         }}
       />
-      <FormScroll>
+      <FormScroll keyboardAware={!amountFocused}>
         <Field label="Nome">
           <TextField value={name} onChangeText={setName} placeholder="Ex.: Restaurantes" autoFocus={!id} />
         </Field>
@@ -151,7 +153,7 @@ export default function CategoryForm() {
 
         {canHaveBudget && (
           <Field label="Limite mensal">
-            <AmountInput value={budgetAmount} onChange={setBudgetAmount} />
+            <AmountInput value={budgetAmount} onChange={setBudgetAmount} onFocusChange={setAmountFocused} />
             <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
               {budgetAmount === 0
                 ? 'Sem limite. Digite um valor para acompanhar quanto gasta nesta categoria.'
