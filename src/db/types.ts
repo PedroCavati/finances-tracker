@@ -16,13 +16,20 @@ export type Account = {
   color: string;
   icon: string;
   archived: number; // 0 | 1
+  // Só cartão de crédito (nas outras contas ficam null/0):
+  closing_day: number | null; // dia do fechamento da fatura
+  due_day: number | null; // dia do vencimento da fatura
+  credit_limit: number; // limite em centavos; 0 = não informado
 };
 
 /** Conta com o saldo calculado até uma data (saldo inicial + lançamentos). */
 export type AccountWithBalance = Account & { balance: number };
 
-/** Dados para criar ou editar uma conta. Arquivar é uma ação à parte. */
-export type AccountInput = Omit<Account, 'id' | 'archived'>;
+/** Campos de uma conta que só valem para cartão de crédito. */
+type CardFields = 'closing_day' | 'due_day' | 'credit_limit';
+
+/** Dados para criar ou editar uma conta. Arquivar é uma ação à parte; os campos de cartão são opcionais. */
+export type AccountInput = Omit<Account, 'id' | 'archived' | CardFields> & Partial<Pick<Account, CardFields>>;
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   checking: 'Conta corrente',
@@ -64,6 +71,10 @@ export type Transaction = {
   to_account_id: number | null;
   category_id: number | null;
   recurrence_id: number | null; // recorrência que gerou este lançamento, se houver
+  // Só em compras parceladas (nos outros lançamentos ficam null):
+  installment_group: number | null; // id da 1ª parcela; liga as parcelas da mesma compra
+  installment_number: number | null; // 1, 2, 3...
+  installment_count: number | null; // total de parcelas
   created_at: string;
 };
 
@@ -77,10 +88,15 @@ export type TransactionRow = Transaction & {
   parent_category_name: string | null;
 };
 
-/** Dados para criar ou editar, sem os campos gerados pelo banco. `recurrence_id` só ao gerar a partir de uma recorrência. */
-export type TransactionInput = Omit<Transaction, 'id' | 'created_at' | 'recurrence_id'> & {
-  recurrence_id?: number | null;
-};
+/** Campos de um lançamento preenchidos pelo app, não pelo formulário. */
+type LinkFields = 'recurrence_id' | 'installment_group' | 'installment_number' | 'installment_count';
+
+/**
+ * Dados para criar ou editar, sem os campos gerados pelo banco. `recurrence_id` só ao gerar
+ * a partir de uma recorrência; os campos de parcela só ao criar uma compra parcelada.
+ */
+export type TransactionInput = Omit<Transaction, 'id' | 'created_at' | LinkFields> &
+  Partial<Pick<Transaction, LinkFields>>;
 
 // ─── Orçamento ─────────────────────────────────────────────────────────────
 

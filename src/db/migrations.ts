@@ -146,6 +146,21 @@ const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         CHECK (notify IN (0, 1));
     `);
   },
+
+  // 5: cartão de crédito (fatura e limite) e compras parceladas
+  async (db) => {
+    await db.execAsync(`
+      ALTER TABLE accounts ADD COLUMN closing_day INTEGER CHECK (closing_day BETWEEN 1 AND 31);
+      ALTER TABLE accounts ADD COLUMN due_day INTEGER CHECK (due_day BETWEEN 1 AND 31);
+      ALTER TABLE accounts ADD COLUMN credit_limit INTEGER NOT NULL DEFAULT 0 CHECK (credit_limit >= 0);
+
+      ALTER TABLE transactions ADD COLUMN installment_group INTEGER;
+      ALTER TABLE transactions ADD COLUMN installment_number INTEGER CHECK (installment_number >= 1);
+      ALTER TABLE transactions ADD COLUMN installment_count INTEGER CHECK (installment_count >= 2);
+
+      CREATE INDEX idx_transactions_installment ON transactions(installment_group);
+    `);
+  },
 ];
 
 
