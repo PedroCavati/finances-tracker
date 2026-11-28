@@ -196,7 +196,7 @@ export default function AccountForm() {
                 <Field label="Vence no dia">
                   <TextField
                     value={dueDay}
-                    onChangeText={(text) => setClosingDay(text.replace(/\D/g, ''))}
+                    onChangeText={(text) => setDueDay(text.replace(/\D/g, ''))}
                     placeholder="Ex.: 3"
                     keyboardType="number-pad"
                     maxLength={2}

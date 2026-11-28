@@ -294,7 +294,7 @@ export async function deleteTransaction(db: SQLiteDatabase, id: number) {
 export async function saveInstallments(
   db: SQLiteDatabase,
   input: TransactionInput,
-  parcels: { amount: number, date: string }[]
+  parcels: { amount: number; date: string }[]
 ) {
   let group = 0;
   await db.withExclusiveTransactionAsync(async (tx) => {
@@ -311,7 +311,7 @@ export async function saveInstallments(
         installment_count: count,
       });
     }
-  })
+  });
   notifyDataChanged();
   return group;
 }
