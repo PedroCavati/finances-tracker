@@ -5,6 +5,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { AmountInput, IconPicker, SwatchPicker } from '@/components/pickers';
 import { FormScroll } from '@/components/screen';
+import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, Field, HeaderButton, Segmented, TextField } from '@/components/ui';
 import { ACCOUNT_ICON_KEYS } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
@@ -17,6 +18,8 @@ import {
 } from '@/db/queries';
 import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { billMonthOf, dueDate } from '@/lib/credit-card';
+import { formatShortDate, today } from '@/lib/dates';
 
 /** Ícone sugerido para cada tipo ao criar uma conta (ao editar, trocar o tipo não muda o ícone). */
 const DEFAULT_ICON: Record<AccountType, string> = {
@@ -50,6 +53,11 @@ export default function AccountForm() {
   const [icon, setIcon] = useState('bank');
   const [saving, setSaving] = useState(false);
 
+  // Cartão de crédito. Os dias ficam como texto enquanto são digitados.
+  const [closingDay, setClosingDay] = useState('');
+  const [dueDay, setDueDay] = useState('');
+  const [creditLimit, setCreditLimit] = useState(0);
+
   // Preenche os campos ao editar.
   useEffect(() => {
     if (!id) return;
@@ -62,11 +70,20 @@ export default function AccountForm() {
       setNegative(account.initial_balance < 0);
       setColor(account.color);
       setIcon(account.icon);
+      setClosingDay(account.closing_day ? String(account.closing_day) : '');
+      setDueDay(account.due_day ? String(account.due_day) : '');
+      setCreditLimit(account.credit_limit);
     });
   }, [db, id]);
 
+  // Cartão: os dois dias são obrigatórios, de 1 a 31.
+  const isCard = type === 'credit_card';
+  const closing = parseDay(closingDay);
+  const due = parseDay(dueDay);
+  const cardOk = !isCard || (closing !== null && due !== null);
+
   // Validação
-  const canSave = name.trim().length > 0 && !saving;
+  const canSave = name.trim().length > 0 && cardOk && !saving;
 
   // ── Ações ──
 
@@ -76,7 +93,17 @@ export default function AccountForm() {
     try {
       await saveAccount(
         db,
-        { name: name.trim(), type, initial_balance: negative ? -balance : balance, color, icon },
+        {
+          name: name.trim(),
+          type,
+          // No cartão, o saldo digitado é sempre dívida.
+          initial_balance: isCard || negative ? -balance : balance,
+          color,
+          icon,
+          closing_day: closing,
+          due_day: due,
+          credit_limit: creditLimit,
+        },
         id
       );
       router.back();
@@ -150,23 +177,73 @@ export default function AccountForm() {
           </View>
         </Field>
 
-        {/* Saldo: na criação é o saldo de hoje; na edição, o inicial (antes dos lançamentos). */}
-        <Field label={id ? 'Saldo inicial' : 'Saldo atual'}>
-          <Segmented
-            value={negative ? 'neg' : 'pos'}
-            onChange={(v) => setNegative(v === 'neg')}
-            options={[
-              { value: 'pos', label: 'Positivo' },
-              { value: 'neg', label: 'Negativo / dívida', color: theme.expense },
-            ]}
-          />
-          <AmountInput
-            value={balance}
-            onChange={setBalance}
-            color={negative ? theme.expense : undefined}
-            onFocusChange={setAmountFocused}
-          />
-        </Field>
+        {/* Fatura e limite (só cartão) */}
+        {isCard && (
+          <>
+            <View style={styles.days}>
+              <View style={styles.day}>
+                <Field label="Fecha no dia">
+                  <TextField
+                    value={closingDay}
+                    onChangeText={(text) => setClosingDay(text.replace(/\D/g, ''))}
+                    placeholder="Ex.: 3"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                </Field>
+              </View>
+              <View style={styles.day}>
+                <Field label="Vence no dia">
+                  <TextField
+                    value={dueDay}
+                    onChangeText={(text) => setClosingDay(text.replace(/\D/g, ''))}
+                    placeholder="Ex.: 3"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                </Field>
+              </View>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+              {closing && due
+                ? `Uma compra feita hoje entra na fatura que vence em ${formatShortDate(dueDate(billMonthOf(today(), closing), closing, due))}.`
+                : 'Informe os dias de 1 a 31, como aparecem na fatura do banco.'}
+            </ThemedText>
+            <Field label="Limite">
+              <AmountInput value={creditLimit} onChange={setCreditLimit} onFocusChange={setAmountFocused} />
+            </Field>
+          </>
+        )}
+
+        {/* Saldo: na criação é o saldo de hoje; na edição, o inicial (antes dos lançamentos).
+          No cartão é sempre dívida: o que já está gasto e ainda não foi pago. */}
+        {isCard ? (
+          <Field label={id ? 'Dívida inicial' : 'Dívida atual no cartão'}>
+            <AmountInput
+              value={balance}
+              onChange={setBalance}
+              color={balance > 0 ? theme.expense : undefined}
+              onFocusChange={setAmountFocused}
+            />
+          </Field>
+        ) : (
+          <Field label={id ? 'Saldo inicial' : 'Saldo atual'}>
+            <Segmented
+              value={negative ? 'neg' : 'pos'}
+              onChange={(v) => setNegative(v === 'neg')}
+              options={[
+                { value: 'pos', label: 'Positivo' },
+                { value: 'neg', label: 'Negativo / dívida', color: theme.expense },
+              ]}
+            />
+            <AmountInput
+              value={balance}
+              onChange={setBalance}
+              color={negative ? theme.expense : undefined}
+              onFocusChange={setAmountFocused}
+            />
+          </Field>
+        )}
 
         {/* Aparência */}
         <Field label="Cor">
@@ -200,6 +277,14 @@ export default function AccountForm() {
   );
 }
 
+// ─── Auxiliares ───────────────────────────────────────────────────────────────
+
+/** "3" → 3; vazio ou fora de 1–31 → null. */
+function parseDay(text: string) {
+  const day = Number(text);
+  return Number.isInteger(day) && day >= 1 && day <= 31 ? day : null;
+}
+
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -210,5 +295,15 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.two,
+  },
+  days: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  day: {
+    flex: 1,
+  },
+  hint: {
+    textAlign: 'center',
   },
 });
