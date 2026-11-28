@@ -1,12 +1,12 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui';
+import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import { iconFor, SWATCHES } from '@/constants/icons';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, formatDayLabel, formatShortDate, today } from '@/lib/dates';
+import { addDays, parseISODate, toISODate, today } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 
 // ─── Valor ────────────────────────────────────────────────────────────────────
@@ -125,35 +125,26 @@ export function IconPicker({
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-/** Escolha de data sem calendário nativo: atalhos Hoje/Ontem e setas de um dia. */
+/**
+ * Campo de data: o seletor compacto nativo (uma pílula com a data; tocar abre o calendário)
+ * e os atalhos Hoje e Ontem. Sem limite de datas: serve para o passado e para o futuro.
+ */
 export function DateField({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
   const theme = useTheme();
   const now = today();
   const yesterday = addDays(now, -1);
   return (
     <View style={styles.dateRow}>
-      <Pressable
-        accessibilityLabel="Dia anterior"
-        hitSlop={8}
-        onPress={() => onChange(addDays(value, -1))}
-        style={[styles.dateArrow, { backgroundColor: theme.backgroundElement }]}>
-        <SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={16} tintColor={theme.text} />
-      </Pressable>
-      <View style={styles.dateLabel}>
-        <ThemedText type="smallBold">{formatDayLabel(value, { short: true })}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {formatShortDate(value)}
-        </ThemedText>
-      </View>
-      <Pressable
-        accessibilityLabel="Próximo dia"
-        hitSlop={8}
-        onPress={() => onChange(addDays(value, 1))}
-        style={[styles.dateArrow, { backgroundColor: theme.backgroundElement }]}>
-        <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={theme.text} />
-      </Pressable>
+      <DateTimePicker
+        value={parseISODate(value)}
+        onValueChange={(_, date) => onChange(toISODate(date))}
+        display='compact'
+        locale='pt_BR'
+        accentColor={theme.tint}
+        presentation='inline'
+      />
       <View style={styles.dateShortcuts}>
-        <Chip label="Hoje" selected={value === now} onPress={() => onChange(now)} />
+        <Chip label='Hoje' selected={value === now} onPress={() => onChange(now)} />
         <Chip label="Ontem" selected={value === yesterday} onPress={() => onChange(yesterday)} />
       </View>
     </View>
@@ -204,17 +195,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     flexWrap: 'wrap',
-  },
-  dateArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateLabel: {
-    minWidth: 120,
-    alignItems: 'center',
   },
   dateShortcuts: {
     flexDirection: 'row',
