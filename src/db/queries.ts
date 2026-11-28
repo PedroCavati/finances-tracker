@@ -359,6 +359,15 @@ export async function deleteInstallmentsFrom(db: SQLiteDatabase, group: number, 
 
 // ─── Cartão de crédito ────────────────────────────────────────────────────────
 
+/** Cartões ativos com fechamento e vencimento definidos (os que têm fatura). */
+export function listBillingCards(db: SQLiteDatabase) {
+  return db.getAllAsync<Account>(
+    `SELECT * FROM accounts
+     WHERE type = 'credit_card' AND archived = 0 AND closing_day IS NOT NULL AND due_day IS NOT NULL
+     ORDER BY name COLLATE NOCASE`
+  );
+}
+
 /**
  * Todos os movimentos de um cartão (compras, estornos e pagamentos), do mais antigo ao mais
  * recente, incluindo parcelas futuras. A divisão em faturas é feita por `summarizeBills`.

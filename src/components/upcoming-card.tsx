@@ -8,6 +8,7 @@ import { Spacing } from '@/constants/theme';
 import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDayLabel, today } from '@/lib/dates';
+import { listCardBills, needsPayment, type CardBill } from '@/lib/card-bills';
 import { formatMoney } from '@/lib/money';
 import { listPendingConfirmations, listUpcoming, type Occurrence } from '@/lib/recurrences';
 
@@ -18,22 +19,23 @@ const UPCOMING_LIMIT = 5;
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 /**
- * Card "Próximos" da Início: primeiro as ocorrências que esperam confirmação,
- * depois as dos próximos 7 dias. Some quando não há nada.
+ * Card "Próximos" da Início: faturas de cartão fechadas a pagar, ocorrências que esperam
+ * confirmação e as dos próximos 7 dias, nessa ordem. Some quando não há nada.
  */
 export function UpcomingCard() {
   const theme = useTheme();
   const now = today();
-  // Dados do banco: pendentes e próximos, numa consulta só.
+  // Dados do banco: faturas, pendentes e próximos, numa consulta só.
   const { data } = useQuery(
     async (db) => ({
+      bills: (await listCardBills(db, now)).filter(needsPayment),
       pending: await listPendingConfirmations(db),
       upcoming: await listUpcoming(db, UPCOMING_DAYS),
     }),
     `upcoming:${now}`
   );
 
-  if (!data || (data.pending.length === 0 && data.upcoming.length === 0)) return null;
+  if (!data || (data.bills.length === 0 && data.pending.length === 0 && data.upcoming.length === 0)) return null;
   const upcoming = data.upcoming.slice(0, UPCOMING_LIMIT);
 
   return (
@@ -47,6 +49,23 @@ export function UpcomingCard() {
           </ThemedText>
         </Pressable>
       </View>
+
+      {/* Faturas fechadas a pagar */}
+      {data.bills.length > 0 && (
+        <>
+          <ThemedText type="small" style={{ color: theme.warning }}>
+            Faturas a pagar
+          </ThemedText>
+          <View>
+            {data.bills.map((item, index) => (
+              <Fragment key={item.card.id}>
+                {index > 0 && <View style={[styles.separator, { backgroundColor: theme.border }]} />}
+                <BillRow item={item} />
+              </Fragment>
+            ))}
+          </View>
+        </>
+      )}
 
       {/* Aguardando confirmação */}
       {data.pending.length > 0 && (
@@ -129,6 +148,31 @@ function OccurrenceRow({ item: { rec, nominal, date }, pending }: { item: Occurr
       <ThemedText type="small" style={[styles.amount, { color }]}>
         {sign}
         {formatMoney(rec.amount)}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+/** Fatura a pagar: cartão, vencimento (em vermelho se venceu) e quanto falta. Tocar abre o cartão. */
+function BillRow({ item: { card, bill } }: { item: CardBill }) {
+  const theme = useTheme();
+  const overdue = bill.status === 'overdue';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push({ pathname: '/card', params: { id: String(card.id) } })}
+      style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}>
+      <Badge size={32} icon={card.icon} color={card.color} />
+      <View style={styles.rowText}>
+        <ThemedText type="small" numberOfLines={1}>
+          Fatura {card.name}
+        </ThemedText>
+        <ThemedText type="small" numberOfLines={1} style={{ color: overdue ? theme.expense : theme.textSecondary }}>
+          {overdue ? 'Venceu' : 'Vence'} {formatDayLabel(bill.due, { short: true }).toLowerCase()}
+        </ThemedText>
+      </View>
+      <ThemedText type="small" style={styles.amount}>
+        {formatMoney(bill.total - bill.paid)}
       </ThemedText>
     </Pressable>
   );

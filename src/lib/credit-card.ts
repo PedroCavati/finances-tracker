@@ -198,3 +198,22 @@ export function defaultBillMonth(card: BillingCard, movements: CardMovement[], t
   const [previous] = summarizeBills(card, movements, [shiftMonth(open, -1)], today);
   return ['closed', 'partial', 'overdue'].includes(previous.status) ? previous.month : open;
 }
+
+/** Situação da fatura em uma linha, para listas: "Fatura aberta · vence 10/12". */
+export function describeBill(bill: Bill) {
+  const due = `${bill.due.slice(8, 10)}/${bill.due.slice(5, 7)}`;
+  switch (bill.status) {
+    case 'future':
+      return `Próxima fatura · vence ${due}`;
+    case 'open':
+      return `Fatura aberta · vence ${due}`;
+    case 'closed':
+      return `Fatura fechada · vence ${due}`;
+    case 'partial':
+      return `Paga em parte · vence ${due}`;
+    case 'overdue':
+      return `Fatura vencida em ${due}`;
+    case 'paid':
+      return 'Fatura paga';
+  }
+}
