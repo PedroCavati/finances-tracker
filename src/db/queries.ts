@@ -21,6 +21,7 @@ import type {
   TransactionKind,
   TransactionRow,
 } from '@/db/types';
+import { CardMovement } from '@/lib/credit-card';
 
 // ─── Contas ────────────────────────────────────────────────────────────────
 
@@ -57,26 +58,34 @@ export function getAccount(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Account>('SELECT * FROM accounts WHERE id = ?', id);
 }
 
-/** Cria a conta (sem `id`) ou atualiza a existente (com `id`). */
+/**
+ * Cria a conta (sem `id`) ou atualiza a existente (com `id`). Fechamento, vencimento e
+ * limite só são gravados em cartão de crédito; nas outras contas ficam vazios.
+*/
 export async function saveAccount(db: SQLiteDatabase, input: AccountInput, id?: number) {
+  const isCard = input.type === 'credit_card';
+  const values = [
+    input.name,
+    input.type,
+    input.initial_balance,
+    input.color,
+    input.icon,
+    isCard ? (input.closing_day ?? null) : null,
+    isCard ? (input.due_day ?? null) : null,
+    isCard ? (input.credit_limit ?? 0) : 0,
+  ]
   if (id) {
     await db.runAsync(
-      'UPDATE accounts SET name = ?, type = ?, initial_balance = ?, color = ?, icon = ? WHERE id = ?',
-      input.name,
-      input.type,
-      input.initial_balance,
-      input.color,
-      input.icon,
+      `UPDATE accounts SET name = ?, type = ?, initial_balance = ?, color = ?, icon = ?,
+       closing_day = ?, due_day = ?, credit_limit = ? WHERE id = ?`,
+      ...values,
       id
     );
   } else {
     await db.runAsync(
-      'INSERT INTO accounts (name, type, initial_balance, color, icon) VALUES (?, ?, ?, ?, ?)',
-      input.name,
-      input.type,
-      input.initial_balance,
-      input.color,
-      input.icon
+      `INSERT INTO accounts (name, type, initial_balance, color, icon, closing_day, due_day, credit_limit)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ...values
     );
   }
   notifyDataChanged();
@@ -225,10 +234,10 @@ export function getTransaction(db: SQLiteDatabase, id: number) {
   return db.getFirstAsync<Transaction>('SELECT * FROM transactions WHERE id = ?', id);
 }
 
-/** Cria ou atualiza o lançamento. Transferências ignoram a categoria; receitas e despesas ignoram a conta de destino. */
-export async function saveTransaction(db: SQLiteDatabase, input: TransactionInput, id?: number) {
+/** Campos que o formulário edita. Transferências ignoram a categoria; receitas e despesas, a conta de destino. */
+function editableValues(input: TransactionInput) {
   const isTransfer = input.kind === 'transfer';
-  const values = [
+  return [
     input.kind,
     input.amount,
     input.date,
@@ -238,20 +247,34 @@ export async function saveTransaction(db: SQLiteDatabase, input: TransactionInpu
     isTransfer ? input.to_account_id : null,
     isTransfer ? null : input.category_id,
   ];
+}
+
+/** Insere um lançamento com os vínculos (recorrência, parcela) e devolve o id. Não avisa as telas. */
+async function insertTransaction(db: SQLiteDatabase, input: TransactionInput) {
+  const result = await db.runAsync(
+    `INSERT INTO transactions (kind, amount, date, description, notes, account_id, to_account_id, category_id,
+       recurrence_id, installment_group, installment_number, installment_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ...editableValues(input),
+    input.recurrence_id ?? null,
+    input.installment_group ?? null,
+    input.installment_number ?? null,
+    input.installment_count ?? null
+  );
+  return result.lastInsertRowId;
+}
+
+/** Cria ou atualiza o lançamento. Ao editar, os vínculos (recorrência, parcela) não mudam. */
+export async function saveTransaction(db: SQLiteDatabase, input: TransactionInput, id?: number) {
   if (id) {
     await db.runAsync(
       `UPDATE transactions SET kind = ?, amount = ?, date = ?, description = ?, notes = ?,
          account_id = ?, to_account_id = ?, category_id = ? WHERE id = ?`,
-      ...values,
+      ...editableValues(input),
       id
     );
   } else {
-    await db.runAsync(
-      `INSERT INTO transactions (kind, amount, date, description, notes, account_id, to_account_id, category_id, recurrence_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ...values,
-      input.recurrence_id ?? null
-    );
+    await insertTransaction(db, input);
   }
   notifyDataChanged();
 }
@@ -260,6 +283,93 @@ export async function saveTransaction(db: SQLiteDatabase, input: TransactionInpu
 export async function deleteTransaction(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
   notifyDataChanged();
+}
+
+// ─── Parcelas ──────────────────────────────────────────────────────────────
+
+/**
+ * Cria uma compra parcelada: um lançamento por parcela, com o valor e a data de cada uma.
+ * Todas ficam ligadas pelo `installment_group`, que é o id da 1ª parcela. Devolve esse id.
+ */
+export async function saveInstallments(
+  db: SQLiteDatabase,
+  input: TransactionInput,
+  parcels: { amount: number, date: string }[]
+) {
+  let group = 0;
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const count = parcels.length;
+    const first = { ...input, ...parcels[0], installment_number: 1, installment_count: count };
+    group = await insertTransaction(tx, first);
+    await tx.runAsync('UPDATE transactions SET installment_group = ? WHERE id = ?', group, group);
+    for (let i = 1; i < count; i++) {
+      await insertTransaction(tx, {
+        ...input,
+        ...parcels[i],
+        installment_group: group,
+        installment_number: i + 1,
+        installment_count: count,
+      });
+    }
+  })
+  notifyDataChanged();
+  return group;
+}
+
+/** Parcelas de uma compra, da 1ª à última. */
+export function listInstallments(db: SQLiteDatabase, group: number) {
+  return db.getAllAsync<Transaction>(
+    'SELECT * FROM transactions WHERE installment_group = ? ORDER BY installment_number',
+    group
+  );
+}
+
+/**
+ * "Esta e as próximas": aplica descrição, observação, conta e categoria às parcelas a partir
+ * de `fromNumber`. Valor e data continuam os de cada parcela.
+ */
+export async function updateInstallmentsFrom(
+  db: SQLiteDatabase,
+  group: number,
+  fromNumber: number,
+  input: Pick<TransactionInput, 'description' | 'notes' | 'account_id' | 'category_id'>
+) {
+  await db.runAsync(
+    `UPDATE transactions SET description = ?, notes = ?, account_id = ?, category_id = ?
+   WHERE installment_group = ? AND installment_number >= ?`,
+    input.description.trim(),
+    input.notes.trim(),
+    input.account_id,
+    input.category_id,
+    group,
+    fromNumber
+  );
+  notifyDataChanged();
+}
+
+/** "Esta e as próximas" ao apagar: remove as parcelas a partir de `fromNumber` (ex.: quitação antecipada). */
+export async function deleteInstallmentsFrom(db: SQLiteDatabase, group: number, fromNumber: number) {
+  await db.runAsync(
+    'DELETE FROM transactions WHERE installment_group = ? AND installment_number >= ?',
+    group,
+    fromNumber
+  );
+  notifyDataChanged();
+}
+
+// ─── Cartão de crédito ────────────────────────────────────────────────────────
+
+/**
+ * Todos os movimentos de um cartão (compras, estornos e pagamentos), do mais antigo ao mais
+ * recente, incluindo parcelas futuras. A divisão em faturas é feita por `summarizeBills`.
+ */
+export function listCardMovements(db: SQLiteDatabase, cardId: number) {
+  return db.getAllAsync<CardMovement>(
+    `SELECT date, kind, amount, account_id, to_account_id FROM transactions
+       WHERE account_id = $card OR to_account_id = $card
+     ORDER BY date`,
+    { $card: cardId }
+  );
 }
 
 // ─── Resumos ───────────────────────────────────────────────────────────────
