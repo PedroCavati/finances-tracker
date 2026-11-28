@@ -79,7 +79,13 @@ function AccountGroup({ accounts }: { accounts: AccountWithBalance[] }) {
           {index > 0 && <View style={[styles.separator, { backgroundColor: theme.border }]} />}
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/account', params: { id: String(account.id) } })}
+            onPress={() =>
+              // Cartão abre a tela de faturas (que tem "Editar"); as outras contas, o formulário.
+              router.push({
+                pathname: account.type === 'credit_card' ? '/card' : '/account',
+                params: { id: String(account.id) },
+              })
+            }
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }, account.archived ? { opacity: 0.6 } : null]}>
             <Badge icon={account.icon} color={account.color} />
             <View style={styles.rowText}>

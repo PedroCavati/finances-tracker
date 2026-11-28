@@ -88,6 +88,12 @@ export function formatDayLabel(iso: string, { short = false }: { short?: boolean
     : `${weekday}, ${date.getDate()} de ${MONTHS[date.getMonth()]}${year ? ` de${year}` : ''}`;
 }
 
+/** "dez/26": mês e ano curtos, para listas de parcelas. */
+export function formatMonthShort(iso: string) {
+  const date = parseISODate(iso);
+  return `${MONTHS_SHORT[date.getMonth()]}/${String(date.getFullYear()).slice(2)}`;
+}
+
 /** "25/11/2026" */
 export function formatShortDate(iso: string) {
   const [y, m, d] = iso.split('-');

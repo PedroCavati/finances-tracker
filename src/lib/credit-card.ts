@@ -172,3 +172,29 @@ export function summarizeBills(card: BillingCard, movements: CardMovement[], mon
     return { month, start, end, closing, due, total, paid, status };
   });
 }
+
+/**
+ * Quanto do limite está em uso: dívida inicial + compras (incluindo parcelas futuras)
+ * − estornos − pagamentos feitos até hoje. O disponível é o limite menos isso.
+ */
+export function usedLimit(card: BillingCard, movements: CardMovement[], today: string) {
+  let used = -card.initial_balance;
+  for (const m of movements) {
+    if (m.kind === 'transfer' && m.to_account_id === card.id) {
+      if (m.date <= today) used -= m.amount;
+    } else {
+      used += m.kind === 'income' ? -m.amount : m.amount;
+    }
+  }
+  return used;
+}
+
+/**
+ * Fatura que o cartão deve mostrar primeiro: a última fechada, se ainda falta pagar;
+ * senão, a aberta.
+ */
+export function defaultBillMonth(card: BillingCard, movements: CardMovement[], today: string) {
+  const open = billMonthOf(today, card.closing_day);
+  const [previous] = summarizeBills(card, movements, [shiftMonth(open, -1)], today);
+  return ['closed', 'partial', 'overdue'].includes(previous.status) ? previous.month : open;
+}

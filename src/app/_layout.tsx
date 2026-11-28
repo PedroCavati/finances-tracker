@@ -45,6 +45,7 @@ export default function RootLayout() {
               <Stack.Screen name="category" options={{ presentation: 'modal' }} />
               {/* Telas empurradas na pilha. "minimal" mostra só a seta no voltar, sem "(tabs)". */}
               <Stack.Screen name="recurrences" options={{ headerBackButtonDisplayMode: 'minimal' }} />
+              <Stack.Screen name="card" options={{ headerBackButtonDisplayMode: 'minimal' }} />
             </Stack>
           </SQLiteProvider>
         </Suspense>

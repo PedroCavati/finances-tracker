@@ -3,20 +3,24 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { InstallmentList } from '@/components/installment-list';
 import { AmountInput, DateField } from '@/components/pickers';
 import { FormScroll } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Chip, EmptyState, Field, HeaderButton, Segmented, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import {
+  deleteInstallmentsFrom,
   deleteRecurrence,
   deleteTransaction,
   getRecurrence,
   getTransaction,
   listAccounts,
   listCategories,
+  saveInstallments,
   saveRecurrence,
   saveTransaction,
+  updateInstallmentsFrom,
 } from '@/db/queries';
 import { ensureNotificationPermission } from '@/lib/notifications';
 import {
@@ -30,6 +34,7 @@ import {
 import { useQuery } from '@/hooks/use-query';
 import { useTheme } from '@/hooks/use-theme';
 import { checkBudgetAlert } from '@/lib/budget-alerts';
+import { distributeInstallments, installmentDates } from '@/lib/credit-card';
 import { addMonthsClamped, formatShortDate, today } from '@/lib/dates';
 import { nthBusinessDay } from '@/lib/holidays';
 import {
@@ -40,6 +45,9 @@ import {
   setPaused,
   skipOccurrence,
 } from '@/lib/recurrences';
+
+/** Máximo de parcelas de uma compra. */
+const MAX_INSTALLMENTS = 48;
 
 /** Tipo no título do modal: "Nova despesa", "Editar receita"... */
 const KIND_TITLES: Record<TransactionKind, string> = {
@@ -71,6 +79,10 @@ export default function TransactionForm() {
     recurrenceId?: string;
     nominal?: string;
     repeat?: Frequency;
+    // Pré-preenchimento (ex.: "Pagar fatura" na tela do cartão)
+    toAccountId?: string;
+    amount?: string;
+    description?: string;
   }>();
   const id = params.id ? Number(params.id) : undefined;
   const recurrenceId = params.recurrenceId ? Number(params.recurrenceId) : undefined;
@@ -79,13 +91,15 @@ export default function TransactionForm() {
   // Campos do lançamento. `loaded` fica falso até os dados de edição chegarem do banco.
   const [loaded, setLoaded] = useState(mode === 'create');
   const [kind, setKind] = useState<TransactionKind>(params.kind ?? 'expense');
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState(params.amount ? Number(params.amount) : 0);
   const [amountFocused, setAmountFocused] = useState(false);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(params.description ?? '');
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(today());
   const [accountId, setAccountId] = useState<number | null>(null);
-  const [toAccountId, setToAccountId] = useState<number | null>(null);
+  const [toAccountId, setToAccountId] = useState<number | null>(
+    params.toAccountId ? Number(params.toAccountId) : null
+  );
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -96,6 +110,12 @@ export default function TransactionForm() {
   const [notify, setNotify] = useState(false);
   const [businessDays, setBusinessDays] = useState<BusinessDayRule>('none');
   const [businessDayN, setBusinessDayN] = useState<number | null>(null);
+
+  // Parcelas de uma compra nova. `fixedParcels[i]` é o valor digitado à mão (null = calculado).
+  const [installments, setInstallments] = useState(1);
+  const [fixedParcels, setFixedParcels] = useState<(number | null)[]>([]);
+  // Ao editar uma parcela já salva: de qual compra ela é e qual o número dela.
+  const [parcel, setParcel] = useState<{ group: number; number: number; count: number } | null>(null);
 
   // Dados do banco
   const now = today();
@@ -115,6 +135,9 @@ export default function TransactionForm() {
           setAccountId(t.account_id);
           setToAccountId(t.to_account_id);
           setCategoryId(t.category_id);
+          if (t.installment_group && t.installment_number && t.installment_count) {
+            setParcel({ group: t.installment_group, number: t.installment_number, count: t.installment_count });
+          }
         }
         setLoaded(true);
       });
@@ -150,7 +173,8 @@ export default function TransactionForm() {
   );
 
   // Conta padrão num lançamento novo: a primeira conta ativa.
-  const firstActive = accounts?.find((a) => !a.archived)?.id ?? null;
+  // Numa transferência já com destino (ex.: pagar fatura), a primeira ativa que não seja o destino.
+  const firstActive = accounts?.find((a) => !a.archived && a.id !== toAccountId)?.id ?? null;
   const effectiveAccountId = accountId ?? (mode === 'create' ? firstActive : null);
 
   // Categorias do tipo atual. Escolher uma subcategoria mantém a principal destacada.
@@ -164,10 +188,18 @@ export default function TransactionForm() {
   // Validação: valor, conta, e numa transferência uma conta de destino diferente da de origem.
   const isTransfer = kind === 'transfer';
   const validTransfer = !isTransfer || (toAccountId !== null && toAccountId !== effectiveAccountId);
-  const canSave = amount > 0 && effectiveAccountId !== null && validTransfer && !saving;
 
-  // Repetição: só aparece ao criar ou editar uma recorrência (não ao editar um lançamento único).
-  const showRepeat = mode === 'create' || mode === 'editRecurrence';
+  // Parcelas: só ao criar uma despesa sem repetição. Com mais de uma, a repetição some.
+  const showInstallments = mode === 'create' && kind === 'expense' && repeat === null;
+  const parcelCount = showInstallments ? installments : 1;
+  const parcelDates = parcelCount > 1 ? installmentDates(date, parcelCount) : [];
+  const parcelFixed = parcelDates.map((_, i) => fixedParcels[i] ?? null);
+  const parcelSplit = parcelCount > 1 ? distributeInstallments(amount, parcelFixed) : null;
+
+  const canSave = amount > 0 && effectiveAccountId !== null && validTransfer && (!parcelSplit || parcelSplit.ok) && !saving;
+
+  // Repetição: só aparece ao criar (sem parcelas) ou editar uma recorrência (não ao editar um lançamento único).
+  const showRepeat = (mode === 'create' && parcelCount === 1) || mode === 'editRecurrence';
   const isRecurring = showRepeat && repeat !== null;
   const usesBusinessDayN = repeat === 'monthly' && businessDayN !== null;
 
@@ -189,8 +221,38 @@ export default function TransactionForm() {
     setCategoryId(null);
   }
 
-  /** Salva conforme o modo: confirma a ocorrência, salva a regra ou salva o lançamento. */
-  async function onSave() {
+  /** Muda a quantidade de parcelas. Os valores digitados à mão são descartados. */
+  function changeInstallments(count: number) {
+    setInstallments(Math.min(Math.max(count, 1), MAX_INSTALLMENTS));
+    setFixedParcels([]);
+  }
+
+  /**
+   * Botão Salvar. Numa parcela que tem outras depois dela, pergunta se as mudanças valem
+   * só para ela ou também para as próximas.
+   */
+  function onSave() {
+    if (!canSave) return;
+    if (!parcel || parcel.number === parcel.count) {
+      persist('one');
+      return;
+    }
+    Alert.alert(
+      `Parcela ${parcel.number} de ${parcel.count}`,
+      'Descrição, conta, categoria e observação podem valer também para as próximas parcelas. Valor e data mudam só nesta.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Só esta parcela', onPress: () => persist('one') },
+        { text: 'Esta e as próximas', onPress: () => persist('following') },
+      ]
+    );
+  }
+
+  /**
+   * Salva conforme o modo: confirma a ocorrência, salva a regra, cria as parcelas ou salva o
+   * lançamento. `scope` só importa ao editar uma parcela ("following" = esta e as próximas).
+   */
+  async function persist(scope: 'one' | 'following') {
     if (!canSave || effectiveAccountId === null) return;
     setSaving(true);
     const transaction = {
@@ -235,9 +297,19 @@ export default function TransactionForm() {
         );
         // Gera na hora o que já venceu (ex.: uma recorrência criada com a data de hoje).
         await runDueRecurrences(db);
+      } else if (parcelSplit?.ok) {
+        await saveInstallments(
+          db,
+          transaction,
+          parcelSplit.amounts.map((value, i) => ({ amount: value, date: parcelDates[i] }))
+        );
       } else {
         await saveTransaction(db, transaction, id);
+        if (parcel && scope === 'following') {
+          await updateInstallmentsFrom(db, parcel.group, parcel.number, transaction);
+        }
       }
+      // Numa compra parcelada, o aviso de orçamento olha o mês da 1ª parcela.
       if (kind === 'expense' && !schedule) {
         // Sem await: o modal fecha na hora e o aviso chega logo depois.
         checkBudgetAlert(db, categoryId, date).catch(() => { });
@@ -270,6 +342,32 @@ export default function TransactionForm() {
       return;
     }
     if (!id) return;
+    if (parcel && parcel.number < parcel.count) {
+      Alert.alert(
+        `Apagar parcela ${parcel.number} de ${parcel.count}?`,
+        'Para uma quitação antecipada, apague esta e as próximas. Isso não pode ser desfeito.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Só esta parcela',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteTransaction(db, id);
+              router.back();
+            },
+          },
+          {
+            text: 'Esta e as próximas',
+            style: 'destructive',
+            onPress: async () => {
+              await deleteInstallmentsFrom(db, parcel.group, parcel.number);
+              router.back();
+            },
+          },
+        ]
+      );
+      return;
+    }
     Alert.alert('Apagar lançamento?', 'Isso não pode ser desfeito.', [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -348,7 +446,9 @@ export default function TransactionForm() {
       ? 'Próxima data'
       : isRecurring
         ? 'Primeira data'
-        : 'Data';
+        : parcelCount > 1
+          ? 'Data da compra'
+          : 'Data';
 
   return (
     <>
@@ -467,6 +567,32 @@ export default function TransactionForm() {
         <Field label={dateLabel}>
           <DateField value={date} onChange={setDate} />
         </Field>
+
+        {/* Parcelas: quantidade e a lista com o valor e o mês de cada uma */}
+        {showInstallments && (
+          <Field label="Parcelas">
+            <Stepper
+              label={installments === 1 ? 'À vista' : `${installments}x`}
+              onDecrease={() => changeInstallments(installments - 1)}
+              onIncrease={() => changeInstallments(installments + 1)}
+            />
+            {parcelCount > 1 && (
+              <InstallmentList
+                total={amount}
+                dates={parcelDates}
+                fixed={parcelFixed}
+                onChangeFixed={setFixedParcels}
+              />
+            )}
+          </Field>
+        )}
+
+        {/* Editando uma parcela já salva */}
+        {parcel && (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+            Parcela {parcel.number} de {parcel.count}. Valor e data desta parcela não mudam as outras.
+          </ThemedText>
+        )}
 
         {/* Repetição: frequência, dia do mês, ajuste de dia útil e modo de lançar */}
         {showRepeat && (
