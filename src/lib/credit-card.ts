@@ -1,5 +1,6 @@
 import { Account, Transaction } from '@/db/types';
 import { addDays, addMonthsClamped, monthKey } from '@/lib/dates';
+import { toBusinessDay } from './holidays';
 
 /**
  * Regras de fatura de cartão de crédito e de compras parceladas. Só cálculo, sem banco.
@@ -32,9 +33,11 @@ export function closingDate(month: string, closingDay: number) {
  * Data de vencimento da fatura do mês. O vencimento vem sempre depois do fechamento:
  * se o dia de vencimento é maior que o de fechamento, vence no mesmo mês; senão, no seguinte.
  * Ex.: fecha dia 3 e vence dia 10 → 03/12 e 10/12. Fecha dia 28 e vence dia 5 → 28/12 e 05/01.
+ * Se o vencimento cair em fim de semana ou feriado, passa para o próximo dia útil
+ * (o fechamento não muda, mesmo em dia não útil).
  */
 export function dueDate(month: string, closingDay: number, dueDay: number) {
-  return dayOfMonth(dueDay > closingDay ? month : shiftMonth(month, 1), dueDay);
+  return toBusinessDay(dayOfMonth(dueDay > closingDay ? month : shiftMonth(month, 1), dueDay), 'next');
 }
 
 /** Mês da fatura em que cai uma compra feita em `date`. */
