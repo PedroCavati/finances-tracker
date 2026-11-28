@@ -26,7 +26,9 @@ export function TransactionRow({ item, accountId }: { item: Row; accountId?: num
       : item.category_name
     : null;
   // Título: descrição, ou a categoria se não houver. Subtítulo: o que sobrou e a conta.
-  const title = item.description || (isTransfer ? 'Transferência' : (category ?? 'Sem categoria'));
+  // Parcela: "TV 3/12".
+  const parcel = item.installment_number ? ` ${item.installment_number}/${item.installment_count}` : '';
+  const title = (item.description || (isTransfer ? 'Transferência' : (category ?? 'Sem categoria'))) + parcel;
   const subtitle = isTransfer
     ? `${item.account_name} → ${item.to_account_name}`
     : [item.description ? category : null, item.account_name].filter(Boolean).join(' · ');
