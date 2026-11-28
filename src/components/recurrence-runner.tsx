@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { useDataVersion } from '@/db/events';
-import { syncRecurrenceReminders } from '@/lib/recurrence-reminders';
+import { syncReminders } from '@/lib/reminders';
 import { runDueRecurrences } from '@/lib/recurrences';
 
 /** Espera os dados pararem de mudar antes de reagendar os lembretes. */
@@ -28,7 +28,7 @@ export function RecurrenceRunner() {
   // Vários salvamentos seguidos viram um só reagendamento.
   useEffect(() => {
     const timer = setTimeout(() => {
-      syncRecurrenceReminders(db).catch(() => { });
+      syncReminders(db).catch(() => { });
     }, REMINDER_SYNC_DELAY_MS)
     return () => clearTimeout(timer);
   }, [db, version]);
